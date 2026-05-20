@@ -1,8 +1,9 @@
 package com.vista.pdg.model.contract;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.vista.pdg.model.contract.def.StructureContract;
+import com.vista.pdg.model.contract.def.VisualOptions;
 import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
-
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -11,17 +12,17 @@ public record TreeContract(
     VisualOptions visual,
     String subtype,
     List<Operation> operations,
-    List<NodeDef> nodes
-) implements StructureContract {
+    List<NodeDef> nodes)
+    implements StructureContract {
 
-    @Override
-    public void accept(ContractValidatorVisitor visitor) {
-        visitor.visit(this);
-    }
+  @Override
+  public void accept(ContractValidatorVisitor visitor) {
+    visitor.visit(this);
+  }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Operation(String op, List<Integer> values) {}
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Operation(String op, List<Integer> values) {}
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record NodeDef(String id, int value, String parent, String side) {}
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record NodeDef(String id, int value, String parent, String side) {}
 }

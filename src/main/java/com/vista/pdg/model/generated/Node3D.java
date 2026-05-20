@@ -10,9 +10,8 @@ public record Node3D(
     double z,
     int depth,
     String parent,
-    Map<String, Object> properties
-) {
-    public Node3D withPosition(double x, double y, double z) {
-        return new Node3D(id, label, x, y, z, depth, parent, properties);
-    }
+    Map<String, Object> properties) {
+  public Node3D withPosition(double x, double y, double z) {
+    return new Node3D(id, label, x, y, z, depth, parent, properties);
+  }
 }

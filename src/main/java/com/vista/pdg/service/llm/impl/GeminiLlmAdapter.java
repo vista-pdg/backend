@@ -8,27 +8,45 @@ import com.google.genai.types.Part;
 import com.vista.pdg.config.GeminiProperties;
 import com.vista.pdg.service.llm.def.AbstractLlmAdapter;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GeminiLlmAdapter extends AbstractLlmAdapter {
 
-    private final String model;
-    private final Client client;
+  private static final Logger log = LoggerFactory.getLogger(GeminiLlmAdapter.class);
 
-    public GeminiLlmAdapter(GeminiProperties geminiProperties, ContractBuilder contractBuilder) {
-        super(contractBuilder);
-        this.client = Client.builder().apiKey(geminiProperties.api().key()).build();
-        this.model = geminiProperties.api().model();
+  private final String model;
+  private final Client client;
+
+  public GeminiLlmAdapter(GeminiProperties geminiProperties, ContractBuilder contractBuilder) {
+    super(contractBuilder);
+    String key = geminiProperties.api().key();
+    this.model = geminiProperties.api().model();
+    log.info(
+        "GeminiLlmAdapter init — model: {}, key: {}***{}",
+        model,
+        key.length() > 8 ? key.substring(0, 4) : "????",
+        key.length() > 8 ? key.substring(key.length() - 4) : "????");
+    this.client = Client.builder().apiKey(key).build();
+  }
+
+  @Override
+  protected String callModel(String systemPrompt, String userPrompt) {
+    log.debug("Calling Gemini model '{}' — prompt: {}", model, userPrompt);
+    try {
+      GenerateContentConfig config =
+          GenerateContentConfig.builder()
+              .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
+              .build();
+      GenerateContentResponse response = client.models.generateContent(model, userPrompt, config);
+      String text = response.text().strip();
+      log.debug("Gemini raw response: {}", text);
+      return text;
+    } catch (Exception e) {
+      log.error("Gemini call failed — model: {}, error: {}", model, e.getMessage(), e);
+      throw e;
     }
-
-    @Override
-    protected String callModel(String systemPrompt, String userPrompt) {
-        GenerateContentConfig config = GenerateContentConfig.builder()
-            .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
-            .build();
-
-        GenerateContentResponse response = client.models.generateContent(model, userPrompt, config);
-        return response.text().strip();
-    }
+  }
 }

@@ -1,5 +1,5 @@
 package com.vista.pdg.service.sdd.def;
 
 public interface Validatable {
-    void accept(ContractValidatorVisitor visitor);
+  void accept(ContractValidatorVisitor visitor);
 }

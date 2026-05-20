@@ -4,5 +4,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "gemini")
 public record GeminiProperties(Api api) {
-    public record Api(String key, String model) {}
+  public record Api(String key, String model) {}
 }

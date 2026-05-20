@@ -1,7 +1,7 @@
 package com.vista.pdg.service.llm.def;
 
-import com.vista.pdg.model.contract.StructureContract;
+import com.vista.pdg.model.contract.def.StructureContract;
 
 public interface LlmAdapter {
-    StructureContract generate(String userPrompt);
+  StructureContract generate(String userPrompt);
 }

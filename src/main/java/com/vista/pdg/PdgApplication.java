@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @EnableConfigurationProperties(GeminiProperties.class)
 public class PdgApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(PdgApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(PdgApplication.class, args);
+  }
 }

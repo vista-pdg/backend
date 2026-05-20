@@ -35,4 +35,7 @@ build/
 ### Python ###
 .venv/
 
-.env/
+.env
+.venv
+.claude/
+

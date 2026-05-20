@@ -1,0 +1,447 @@
+{
+  "info": {
+    "name": "Vista — 3D Discrete Structures",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "{{baseUrl}}", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Graphs",
+      "item": [
+        {
+          "name": "Undirected graph (adjacency)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"undirected graph with nodes A, B, C where A connects to B and B connects to C\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is graph', () => pm.expect(body.meta.type).to.eql('graph'));",
+                  "pm.test('has at least one node', () => pm.expect(body.nodes.length).to.be.greaterThan(0));",
+                  "pm.test('has at least one edge', () => pm.expect(body.edges.length).to.be.greaterThan(0));",
+                  "pm.test('nodes have required fields', () => {",
+                  "  body.nodes.forEach(n => {",
+                  "    pm.expect(n).to.have.all.keys('id', 'label', 'x', 'y', 'z', 'depth');",
+                  "  });",
+                  "});",
+                  "pm.test('all edges are undirected', () => {",
+                  "  body.edges.forEach(e => pm.expect(e.directed).to.be.false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Directed weighted graph",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"directed graph with nodes A, B, C and edges A to B weight 3, B to C weight 1, A to C weight 7\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is graph', () => pm.expect(body.meta.type).to.eql('graph'));",
+                  "pm.test('has nodes and edges', () => {",
+                  "  pm.expect(body.nodes.length).to.be.greaterThan(0);",
+                  "  pm.expect(body.edges.length).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('all edges are directed', () => {",
+                  "  body.edges.forEach(e => pm.expect(e.directed).to.be.true);",
+                  "});",
+                  "pm.test('at least one edge has weight', () => {",
+                  "  const weighted = body.edges.filter(e => e.weight !== null && e.weight !== undefined);",
+                  "  pm.expect(weighted.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete graph K4",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"complete undirected graph with 4 vertices\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is graph', () => pm.expect(body.meta.type).to.eql('graph'));",
+                  "pm.test('has nodes', () => pm.expect(body.meta.nodeCount).to.be.greaterThan(0));",
+                  "pm.test('has edges', () => pm.expect(body.meta.edgeCount).to.be.greaterThan(0));",
+                  "pm.test('complete graph: edges = n*(n-1)/2', () => {",
+                  "  const n = body.meta.nodeCount;",
+                  "  const expectedEdges = (n * (n - 1)) / 2;",
+                  "  pm.expect(body.meta.edgeCount).to.eql(expectedEdges);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Trees",
+      "item": [
+        {
+          "name": "AVL tree — insert sequence",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"AVL tree inserting 10, 5, 15, 3, 7\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is tree', () => pm.expect(body.meta.type).to.eql('tree'));",
+                  "pm.test('meta subtype is avl', () => pm.expect(body.meta.subtype).to.eql('avl'));",
+                  "pm.test('has nodes', () => pm.expect(body.nodes.length).to.be.greaterThan(0));",
+                  "pm.test('tree has n-1 edges', () => {",
+                  "  pm.expect(body.edges.length).to.eql(body.nodes.length - 1);",
+                  "});",
+                  "pm.test('exactly one root node', () => {",
+                  "  const roots = body.nodes.filter(n => n.depth === 0);",
+                  "  pm.expect(roots.length).to.eql(1);",
+                  "});",
+                  "pm.test('nodes have balanceFactor', () => {",
+                  "  body.nodes.forEach(n => pm.expect(n.properties).to.have.property('balanceFactor'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Max-heap — insert sequence",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"max-heap inserting values 3, 10, 5, 1, 8\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta subtype is heap', () => pm.expect(body.meta.subtype).to.eql('heap'));",
+                  "pm.test('has nodes', () => pm.expect(body.nodes.length).to.be.greaterThan(0));",
+                  "pm.test('tree has n-1 edges', () => {",
+                  "  pm.expect(body.edges.length).to.eql(body.nodes.length - 1);",
+                  "});",
+                  "pm.test('root value is greater than or equal to its children', () => {",
+                  "  const root = body.nodes.find(n => n.depth === 0);",
+                  "  pm.expect(root).to.not.be.undefined;",
+                  "  const rootVal = parseInt(root.label);",
+                  "  const children = body.nodes.filter(n => n.depth === 1);",
+                  "  children.forEach(c => pm.expect(rootVal).to.be.at.least(parseInt(c.label)));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BST — insert and depth check",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"binary search tree inserting 8, 4, 12, 2, 6\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is tree', () => pm.expect(body.meta.type).to.eql('tree'));",
+                  "pm.test('meta subtype is bst', () => pm.expect(body.meta.subtype).to.eql('bst'));",
+                  "pm.test('has nodes', () => pm.expect(body.nodes.length).to.be.greaterThan(0));",
+                  "pm.test('all nodes have non-negative depth', () => {",
+                  "  body.nodes.forEach(n => pm.expect(n.depth).to.be.at.least(0));",
+                  "});",
+                  "pm.test('exactly one root', () => {",
+                  "  pm.expect(body.nodes.filter(n => n.depth === 0).length).to.eql(1);",
+                  "});",
+                  "pm.test('tree structural integrity: n-1 edges', () => {",
+                  "  pm.expect(body.edges.length).to.eql(body.nodes.length - 1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lattices",
+      "item": [
+        {
+          "name": "Hasse diagram — divisors of 12",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Hasse diagram of the divisors of 12\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is lattice', () => pm.expect(body.meta.type).to.eql('lattice'));",
+                  "pm.test('meta subtype is divisors', () => pm.expect(body.meta.subtype).to.eql('divisors'));",
+                  "pm.test('has nodes', () => pm.expect(body.meta.nodeCount).to.be.greaterThan(0));",
+                  "pm.test('has edges', () => pm.expect(body.meta.edgeCount).to.be.greaterThan(0));",
+                  "pm.test('nodes have xyz coordinates', () => {",
+                  "  body.nodes.forEach(n => {",
+                  "    pm.expect(n).to.include.keys('x', 'y', 'z');",
+                  "  });",
+                  "});",
+                  "pm.test('has a bottom element (depth 0)', () => {",
+                  "  pm.expect(body.nodes.filter(n => n.depth === 0).length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Power set of 3 elements",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"power set lattice of a set with 3 elements\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is lattice', () => pm.expect(body.meta.type).to.eql('lattice'));",
+                  "pm.test('has nodes', () => pm.expect(body.meta.nodeCount).to.be.greaterThan(0));",
+                  "pm.test('power set has levels 0 through n', () => {",
+                  "  const depths = [...new Set(body.nodes.map(n => n.depth))].sort((a,b) => a-b);",
+                  "  pm.expect(depths[0]).to.eql(0);",
+                  "  pm.expect(depths.length).to.be.greaterThan(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Relations",
+      "item": [
+        {
+          "name": "Divisibility — partial order",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"divisibility relation on the set {1, 2, 3, 4, 6}, check reflexive, antisymmetric and transitive\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is relation', () => pm.expect(body.meta.type).to.eql('relation'));",
+                  "pm.test('computedProperties present', () => {",
+                  "  pm.expect(body.meta.computedProperties).to.be.an('object');",
+                  "});",
+                  "pm.test('is partial order', () => {",
+                  "  const props = body.meta.computedProperties;",
+                  "  pm.expect(props.reflexive).to.be.true;",
+                  "  pm.expect(props.antisymmetric).to.be.true;",
+                  "  pm.expect(props.transitive).to.be.true;",
+                  "});",
+                  "pm.test('has nodes and edges', () => {",
+                  "  pm.expect(body.nodes.length).to.be.greaterThan(0);",
+                  "  pm.expect(body.edges.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Congruence mod 2 — equivalence relation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"congruence mod 2 relation on the set {1, 2, 3, 4}, check reflexive, symmetric, transitive\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('no error', () => pm.expect(body.error).to.be.false);",
+                  "pm.test('meta type is relation', () => pm.expect(body.meta.type).to.eql('relation'));",
+                  "pm.test('is equivalence relation', () => {",
+                  "  const props = body.meta.computedProperties;",
+                  "  pm.expect(props.reflexive).to.be.true;",
+                  "  pm.expect(props.symmetric).to.be.true;",
+                  "  pm.expect(props.transitive).to.be.true;",
+                  "});",
+                  "pm.test('has equivalence classes', () => {",
+                  "  const classes = body.meta.computedProperties.equivalenceClasses;",
+                  "  pm.expect(classes).to.be.an('array');",
+                  "  pm.expect(classes.length).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('every element belongs to exactly one class', () => {",
+                  "  const classes = body.meta.computedProperties.equivalenceClasses;",
+                  "  const nodeIds = body.nodes.map(n => n.id);",
+                  "  const flatClasses = classes.flat();",
+                  "  pm.expect(flatClasses.length).to.eql(nodeIds.length);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error cases",
+      "item": [
+        {
+          "name": "Invalid prompt — expect error response",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"xyzzy nonsense that cannot possibly be a discrete structure 12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200, 422 or 503', () => {",
+                  "  pm.expect([200, 422, 503]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is valid JSON', () => {",
+                  "  pm.expect(() => pm.response.json()).to.not.throw();",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing prompt field",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/generate",
+            "header": [{ "key": "Content-Type", "value": "{{contentType}}" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('not 200', () => pm.expect(pm.response.code).to.not.eql(200));",
+                  "pm.test('client error (4xx)', () => {",
+                  "  pm.expect(pm.response.code).to.be.within(400, 499);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

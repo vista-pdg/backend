@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    spotless:
+      glob: "*.java"
+      run: ./mvnw spotless:apply && git add {staged_files}
