@@ -1,6 +1,7 @@
 package com.vista.pdg.model.contract;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
 
 import java.util.List;
 
@@ -13,4 +14,9 @@ public record RelationContract(
     List<List<Object>> pairs,
     List<String> check
 ) implements StructureContract {
+
+    @Override
+    public void accept(ContractValidatorVisitor visitor) {
+        visitor.visit(this);
+    }
 }

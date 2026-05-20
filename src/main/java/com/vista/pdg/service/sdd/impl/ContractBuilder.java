@@ -1,13 +1,8 @@
 package com.vista.pdg.service.sdd.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.exception.InvalidContractException;
-import com.vista.pdg.model.contract.GraphContract;
-import com.vista.pdg.model.contract.LatticeContract;
-import com.vista.pdg.model.contract.RelationContract;
 import com.vista.pdg.model.contract.StructureContract;
-import com.vista.pdg.model.contract.TreeContract;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -23,17 +18,7 @@ public class ContractBuilder {
 
     public StructureContract build(String json) {
         try {
-            JsonNode root = mapper.readTree(json);
-            String type = root.path("type").asText();
-
-            StructureContract contract = switch (type) {
-                case "graph"    -> mapper.treeToValue(root, GraphContract.class);
-                case "tree"     -> mapper.treeToValue(root, TreeContract.class);
-                case "lattice"  -> mapper.treeToValue(root, LatticeContract.class);
-                case "relation" -> mapper.treeToValue(root, RelationContract.class);
-                default -> throw new InvalidContractException("Unknown type: \"" + type + "\"");
-            };
-
+            StructureContract contract = mapper.readValue(json, StructureContract.class);
             validator.validate(contract);
             return contract;
 
