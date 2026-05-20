@@ -6,9 +6,6 @@ import com.vista.pdg.model.contract.RelationContract;
 import com.vista.pdg.model.contract.StructureContract;
 import com.vista.pdg.model.contract.TreeContract;
 import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
-import com.vista.pdg.service.sdd.impl.validator.GraphContractValidator;
-import com.vista.pdg.service.sdd.impl.validator.LatticeContractValidator;
-import com.vista.pdg.service.sdd.impl.validator.RelationContractValidator;
 import com.vista.pdg.service.sdd.def.SpecificValidator;
 
 import org.springframework.stereotype.Component;
