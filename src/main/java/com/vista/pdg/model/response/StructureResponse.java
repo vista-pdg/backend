@@ -59,7 +59,7 @@ public record StructureResponse(
   private static String extractSubtype(StructureContract contract) {
     return switch (contract) {
       case com.vista.pdg.model.contract.TreeContract t -> t.subtype();
-      case com.vista.pdg.model.contract.LatticeContract l -> l.subtype();
+      case com.vista.pdg.model.contract.LinkedListContract ll -> ll.subtype();
       default -> null;
     };
   }

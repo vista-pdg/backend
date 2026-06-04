@@ -7,13 +7,12 @@ import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record RelationContract(
+public record HashTableContract(
     String type,
     VisualOptions visual,
-    List<Object> set,
-    String rule,
-    List<List<Object>> pairs,
-    List<String> check)
+    int size, // number of buckets
+    List<Integer> values,
+    String hashFunction) // "modular" (default)
     implements StructureContract {
 
   @Override

@@ -1,6 +1,6 @@
 package com.vista.pdg.service.layout.impl;
 
-import com.vista.pdg.model.contract.RelationContract;
+import com.vista.pdg.model.contract.LinkedListContract;
 import com.vista.pdg.model.generated.GeneratedStructure;
 import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.service.layout.def.LayoutStrategy;
@@ -31,25 +31,16 @@ public class LayoutDispatcher {
     }
     return switch (structure.contract().type()) {
       case "tree" -> "hierarchical3d";
-      case "lattice" -> "levels3d";
-      case "relation" -> resolveRelationLayout(structure);
+      case "linked-list" -> resolveLinkedListLayout(structure);
+      case "hash-table" -> "bucket3d";
       default -> "force3d";
     };
   }
 
-  private String resolveRelationLayout(GeneratedStructure structure) {
-    if (structure.contract() instanceof RelationContract r && r.check() != null) {
-      boolean reflexive = isTrue(structure, "reflexive");
-      boolean symmetric = isTrue(structure, "symmetric");
-      boolean transitive = isTrue(structure, "transitive");
-      boolean antisymmetric = isTrue(structure, "antisymmetric");
-      if (reflexive && symmetric && transitive) return "cluster3d";
-      if (antisymmetric && transitive) return "levels3d";
+  private String resolveLinkedListLayout(GeneratedStructure structure) {
+    if (structure.contract() instanceof LinkedListContract l && "circular".equals(l.subtype())) {
+      return "circular3d";
     }
-    return "circular3d";
-  }
-
-  private boolean isTrue(GeneratedStructure structure, String key) {
-    return Boolean.TRUE.equals(structure.computedProperties().get(key));
+    return "linear3d";
   }
 }

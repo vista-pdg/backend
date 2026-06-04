@@ -5,16 +5,13 @@ import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.model.contract.def.VisualOptions;
 import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
 import java.util.List;
-import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record LatticeContract(
+public record LinkedListContract(
     String type,
     VisualOptions visual,
-    String subtype,
-    Map<String, Object> params,
-    List<String> elements,
-    List<List<String>> order)
+    String subtype, // singly | doubly | circular
+    List<Integer> values)
     implements StructureContract {
 
   @Override

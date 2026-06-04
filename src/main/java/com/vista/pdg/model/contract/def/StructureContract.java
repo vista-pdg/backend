@@ -3,8 +3,8 @@ package com.vista.pdg.model.contract.def;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.vista.pdg.model.contract.GraphContract;
-import com.vista.pdg.model.contract.LatticeContract;
-import com.vista.pdg.model.contract.RelationContract;
+import com.vista.pdg.model.contract.HashTableContract;
+import com.vista.pdg.model.contract.LinkedListContract;
 import com.vista.pdg.model.contract.TreeContract;
 import com.vista.pdg.service.sdd.def.ContractValidatorVisitor;
 import com.vista.pdg.service.sdd.def.Validatable;
@@ -17,8 +17,8 @@ import com.vista.pdg.service.sdd.def.Validatable;
 @JsonSubTypes({
   @JsonSubTypes.Type(value = GraphContract.class, name = "graph"),
   @JsonSubTypes.Type(value = TreeContract.class, name = "tree"),
-  @JsonSubTypes.Type(value = LatticeContract.class, name = "lattice"),
-  @JsonSubTypes.Type(value = RelationContract.class, name = "relation")
+  @JsonSubTypes.Type(value = LinkedListContract.class, name = "linked-list"),
+  @JsonSubTypes.Type(value = HashTableContract.class, name = "hash-table")
 })
 public interface StructureContract extends Validatable {
   String type();
