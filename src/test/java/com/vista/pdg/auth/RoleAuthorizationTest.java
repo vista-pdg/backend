@@ -1,6 +1,7 @@
 package com.vista.pdg.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.jsonwebtoken.Jwts;
@@ -26,10 +27,18 @@ class RoleAuthorizationTest extends IntegrationTestSupport {
   @Value("${jwt.secret}")
   private String secret;
 
+  /**
+   * 401 y no 403: el cliente distingue «no estás autenticado» —que se arregla refrescando el token—
+   * de «tu rol no alcanza», que no se arregla de ninguna manera. Colapsar ambas en 403 dejaba
+   * muerto el refresco silencioso del frontend.
+   */
   @Test
-  @DisplayName("sin token no se accede a la zona de administración")
+  @DisplayName("sin token responde 401, no 403")
   void sinToken() throws Exception {
-    mockMvc.perform(get(ADMIN_URL)).andExpect(status().isForbidden());
+    mockMvc
+        .perform(get(ADMIN_URL))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
   }
 
   @Test
@@ -60,7 +69,7 @@ class RoleAuthorizationTest extends IntegrationTestSupport {
   }
 
   @Test
-  @DisplayName("un token de acceso expirado no autentica")
+  @DisplayName("un token de acceso expirado responde 401 para que el cliente lo refresque")
   void tokenExpirado() throws Exception {
     long now = System.currentTimeMillis();
     String expirado =
@@ -74,12 +83,12 @@ class RoleAuthorizationTest extends IntegrationTestSupport {
 
     mockMvc
         .perform(get(ADMIN_URL).header("Authorization", "Bearer " + expirado))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   /** Sin esto, cualquiera podría fabricarse un token de administrador. */
   @Test
-  @DisplayName("un token firmado con otra clave no autentica")
+  @DisplayName("un token firmado con otra clave responde 401")
   void tokenConFirmaAjena() throws Exception {
     String falsificado =
         Jwts.builder()
@@ -95,7 +104,7 @@ class RoleAuthorizationTest extends IntegrationTestSupport {
 
     mockMvc
         .perform(get(ADMIN_URL).header("Authorization", "Bearer " + falsificado))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   /**
@@ -124,10 +133,10 @@ class RoleAuthorizationTest extends IntegrationTestSupport {
   }
 
   @Test
-  @DisplayName("una cabecera Authorization mal formada se ignora sin romper la petición")
+  @DisplayName("una cabecera Authorization mal formada responde 401 sin romper la petición")
   void cabeceraMalFormada() throws Exception {
     mockMvc
         .perform(get(ADMIN_URL).header("Authorization", "esto-no-es-un-bearer"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 }

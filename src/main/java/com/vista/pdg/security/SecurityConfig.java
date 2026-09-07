@@ -20,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
   private final JwtAuthFilter jwtAuthFilter;
+  private final RestAuthenticationEntryPoint authenticationEntryPoint;
 
   @Bean
   SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -42,6 +43,9 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
+        // 401 cuando no hay autenticación, 403 cuando la hay pero el rol no alcanza. El cliente
+        // necesita distinguirlas: la primera la resuelve refrescando el token, la segunda no.
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
