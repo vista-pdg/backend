@@ -27,7 +27,14 @@ public class SecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/auth/**")
+                auth
+                    // El propio token de refresco autentica estas llamadas, así que no exigen
+                    // un token de acceso: en /refresh y /logout lo normal es que ya haya expirado.
+                    .requestMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/refresh",
+                        "/api/auth/logout")
                     .permitAll()
                     .requestMatchers("/api/generate", "/api/algorithm/steps")
                     .permitAll()
