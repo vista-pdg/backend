@@ -28,8 +28,7 @@ public class HashTableGenerator implements StructureGenerator<HashTableContract>
 
     // Bucket nodes (depth 0, no parent)
     for (int i = 0; i < size; i++) {
-      nodes.add(
-          new Node3D("b" + i, "[" + i + "]", 0, 0, 0, 0, null, Map.of("bucket", true)));
+      nodes.add(new Node3D("b" + i, "[" + i + "]", 0, 0, 0, 0, null, Map.of("bucket", true)));
     }
 
     // Distribute values into buckets using separate chaining
@@ -52,6 +51,9 @@ public class HashTableGenerator implements StructureGenerator<HashTableContract>
     }
 
     return new GeneratedStructure(
-        contract, nodes, edges, Map.of("bucketCount", size, "loadFactor", (double) values.size() / size));
+        contract,
+        nodes,
+        edges,
+        Map.of("bucketCount", size, "loadFactor", (double) values.size() / size));
   }
 }

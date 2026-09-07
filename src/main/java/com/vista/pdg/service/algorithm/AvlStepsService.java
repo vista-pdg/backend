@@ -30,9 +30,15 @@ public class AvlStepsService {
     int[] idx = {0};
     AvlNode root = null;
 
-    steps.add(makeStep(idx[0]++, "Árbol AVL vacío",
-        "Estado inicial. Se insertarán los valores: " + values,
-        "initial", List.of(), null, null));
+    steps.add(
+        makeStep(
+            idx[0]++,
+            "Árbol AVL vacío",
+            "Estado inicial. Se insertarán los valores: " + values,
+            "initial",
+            List.of(),
+            null,
+            null));
 
     for (int v : values) {
       List<RotationEvent> rotations = new ArrayList<>();
@@ -40,36 +46,77 @@ public class AvlStepsService {
 
       if (rotations.isEmpty()) {
         root = avlInsert(root, v);
-        steps.add(makeStep(idx[0]++, "Insertar " + v,
-            "Nodo " + v + " insertado como hoja. El árbol permanece balanceado: no se requieren rotaciones.",
-            "insert", List.of(nid(v)), null, root));
+        steps.add(
+            makeStep(
+                idx[0]++,
+                "Insertar " + v,
+                "Nodo "
+                    + v
+                    + " insertado como hoja. El árbol permanece balanceado: no se requieren rotaciones.",
+                "insert",
+                List.of(nid(v)),
+                null,
+                root));
       } else {
         AvlNode bstState = bstInsert(deepClone(root), v);
-        steps.add(makeStep(idx[0]++, "Insertar " + v + " (BST)",
-            "Nodo " + v + " colocado según la regla BST. El árbol puede haber quedado desbalanceado.",
-            "insert", List.of(nid(v)), null, bstState));
+        steps.add(
+            makeStep(
+                idx[0]++,
+                "Insertar " + v + " (BST)",
+                "Nodo "
+                    + v
+                    + " colocado según la regla BST. El árbol puede haber quedado desbalanceado.",
+                "insert",
+                List.of(nid(v)),
+                null,
+                bstState));
 
         AvlNode working = deepClone(bstState);
         updateAllHeights(working);
 
         for (RotationEvent re : rotations) {
-          steps.add(makeStep(idx[0]++, "Desbalance en nodo " + re.pivotValue(),
-              "Factor de balance de nodo " + re.pivotValue() + " = " + re.bf()
-                  + ". " + re.description() + ".",
-              "unbalanced", List.of(nid(re.pivotValue())), re.rotationType(), working));
+          steps.add(
+              makeStep(
+                  idx[0]++,
+                  "Desbalance en nodo " + re.pivotValue(),
+                  "Factor de balance de nodo "
+                      + re.pivotValue()
+                      + " = "
+                      + re.bf()
+                      + ". "
+                      + re.description()
+                      + ".",
+                  "unbalanced",
+                  List.of(nid(re.pivotValue())),
+                  re.rotationType(),
+                  working));
 
           working = applyRotationAt(working, re.pivotValue(), re.direction());
           updateAllHeights(working);
 
-          steps.add(makeStep(idx[0]++, re.description(),
-              "Nodo " + re.newRootValue() + " es la nueva raíz del subárbol. Factor de balance restaurado.",
-              "rotated", List.of(nid(re.newRootValue())), null, working));
+          steps.add(
+              makeStep(
+                  idx[0]++,
+                  re.description(),
+                  "Nodo "
+                      + re.newRootValue()
+                      + " es la nueva raíz del subárbol. Factor de balance restaurado.",
+                  "rotated",
+                  List.of(nid(re.newRootValue())),
+                  null,
+                  working));
         }
 
         root = avlInsert(root, v);
-        steps.add(makeStep(idx[0]++, v + " insertado — árbol balanceado",
-            "Todas las rotaciones completadas. |BF| ≤ 1 para todos los nodos.",
-            "balanced", List.of(nid(v)), null, root));
+        steps.add(
+            makeStep(
+                idx[0]++,
+                v + " insertado — árbol balanceado",
+                "Todas las rotaciones completadas. |BF| ≤ 1 para todos los nodos.",
+                "balanced",
+                List.of(nid(v)),
+                null,
+                root));
       }
     }
 
@@ -82,34 +129,50 @@ public class AvlStepsService {
     return "node-" + value;
   }
 
-  private AlgorithmStep makeStep(int index, String title, String description,
-      String highlightType, List<String> highlightedIds, String rotationType, AvlNode root) {
+  private AlgorithmStep makeStep(
+      int index,
+      String title,
+      String description,
+      String highlightType,
+      List<String> highlightedIds,
+      String rotationType,
+      AvlNode root) {
 
     List<Node3D> nodes = new ArrayList<>();
     List<Edge3D> edges = new ArrayList<>();
 
     if (root != null) {
       buildSnapshot(root, null, 0, nodes, edges);
-      Map<String, Vec3> positions = treeLayout.compute(
-          new GeneratedStructure(null, nodes, edges, Map.of()));
-      nodes = nodes.stream()
-          .map(n -> {
-            Vec3 p = positions.getOrDefault(n.id(), Vec3.zero());
-            return n.withPosition(p.x(), p.y(), p.z());
-          })
-          .toList();
+      Map<String, Vec3> positions =
+          treeLayout.compute(new GeneratedStructure(null, nodes, edges, Map.of()));
+      nodes =
+          nodes.stream()
+              .map(
+                  n -> {
+                    Vec3 p = positions.getOrDefault(n.id(), Vec3.zero());
+                    return n.withPosition(p.x(), p.y(), p.z());
+                  })
+              .toList();
     }
 
-    return new AlgorithmStep(index, title, description, highlightType,
-        highlightedIds, rotationType, nodes, edges);
+    return new AlgorithmStep(
+        index, title, description, highlightType, highlightedIds, rotationType, nodes, edges);
   }
 
-  private void buildSnapshot(AvlNode n, String parentId, int depth,
-      List<Node3D> nodes, List<Edge3D> edges) {
+  private void buildSnapshot(
+      AvlNode n, String parentId, int depth, List<Node3D> nodes, List<Edge3D> edges) {
     if (n == null) return;
     String id = nid(n.value);
-    nodes.add(new Node3D(id, String.valueOf(n.value), 0, 0, 0, depth, parentId,
-        Map.of("balanceFactor", bf(n), "height", n.height)));
+    nodes.add(
+        new Node3D(
+            id,
+            String.valueOf(n.value),
+            0,
+            0,
+            0,
+            depth,
+            parentId,
+            Map.of("balanceFactor", bf(n), "height", n.height)));
     if (parentId != null)
       edges.add(new Edge3D("edge-" + parentId + "-" + id, parentId, id, null, true));
     buildSnapshot(n.left, id, depth + 1, nodes, edges);
@@ -156,16 +219,27 @@ public class AvlStepsService {
       if (isLR) {
         int p1 = n.left.value;
         int r1 = n.left.right.value;
-        events.add(new RotationEvent("left", p1, bf(n.left), r1,
-            "Rotación Izquierda en nodo " + p1 + " (caso LR, paso 1/2)", "left-right"));
+        events.add(
+            new RotationEvent(
+                "left",
+                p1,
+                bf(n.left),
+                r1,
+                "Rotación Izquierda en nodo " + p1 + " (caso LR, paso 1/2)",
+                "left-right"));
         n.left = rotateLeft(n.left);
       }
       int newRoot = n.left.value;
-      events.add(new RotationEvent("right", n.value, b, newRoot,
-          isLR
-              ? "Rotación Derecha en nodo " + n.value + " (caso LR, paso 2/2)"
-              : "Rotación Derecha en nodo " + n.value + " (caso LL)",
-          isLR ? "left-right" : "right"));
+      events.add(
+          new RotationEvent(
+              "right",
+              n.value,
+              b,
+              newRoot,
+              isLR
+                  ? "Rotación Derecha en nodo " + n.value + " (caso LR, paso 2/2)"
+                  : "Rotación Derecha en nodo " + n.value + " (caso LL)",
+              isLR ? "left-right" : "right"));
       return rotateRight(n);
     }
     if (b < -1) {
@@ -173,16 +247,27 @@ public class AvlStepsService {
       if (isRL) {
         int p1 = n.right.value;
         int r1 = n.right.left.value;
-        events.add(new RotationEvent("right", p1, bf(n.right), r1,
-            "Rotación Derecha en nodo " + p1 + " (caso RL, paso 1/2)", "right-left"));
+        events.add(
+            new RotationEvent(
+                "right",
+                p1,
+                bf(n.right),
+                r1,
+                "Rotación Derecha en nodo " + p1 + " (caso RL, paso 1/2)",
+                "right-left"));
         n.right = rotateRight(n.right);
       }
       int newRoot = n.right.value;
-      events.add(new RotationEvent("left", n.value, b, newRoot,
-          isRL
-              ? "Rotación Izquierda en nodo " + n.value + " (caso RL, paso 2/2)"
-              : "Rotación Izquierda en nodo " + n.value + " (caso RR)",
-          isRL ? "right-left" : "left"));
+      events.add(
+          new RotationEvent(
+              "left",
+              n.value,
+              b,
+              newRoot,
+              isRL
+                  ? "Rotación Izquierda en nodo " + n.value + " (caso RL, paso 2/2)"
+                  : "Rotación Izquierda en nodo " + n.value + " (caso RR)",
+              isRL ? "right-left" : "left"));
       return rotateLeft(n);
     }
     return n;
@@ -203,10 +288,8 @@ public class AvlStepsService {
     if (root == null) return null;
     if (root.value == pivotValue)
       return "left".equals(direction) ? rotateLeft(root) : rotateRight(root);
-    if (pivotValue < root.value)
-      root.left = applyRotationAt(root.left, pivotValue, direction);
-    else
-      root.right = applyRotationAt(root.right, pivotValue, direction);
+    if (pivotValue < root.value) root.left = applyRotationAt(root.left, pivotValue, direction);
+    else root.right = applyRotationAt(root.right, pivotValue, direction);
     return root;
   }
 
