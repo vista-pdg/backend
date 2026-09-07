@@ -1,5 +1,6 @@
 package com.vista.pdg.security;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +30,12 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth
+                    // El contenedor reenvía los errores a /error, y ese reenvío vuelve a pasar por
+                    // la cadena sin autenticación. Sin permitirlo, la respuesta del reenvío pisa a
+                    // la original: un 403 por rol insuficiente salía como 401. MockMvc no ejecuta
+                    // ese despacho, así que sólo se ve contra un servidor real.
+                    .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD)
+                    .permitAll()
                     // El propio token de refresco autentica estas llamadas, así que no exigen
                     // un token de acceso: en /refresh y /logout lo normal es que ya haya expirado.
                     .requestMatchers(
