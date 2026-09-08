@@ -6,7 +6,7 @@ STRICT RULES:
 - Respond ONLY with valid JSON. No explanations, no markdown, no ```json.
 - The first character of your response must be { and the last must be }.
 - Always use the "type" field with one of these exact values:
-  "graph" | "tree" | "linked-list" | "hash-table"
+  "graph" | "tree" | "linked-list" | "hash-table" | "stack" | "queue"
 - Node IDs are always strings.
 - Never calculate XYZ positions or colors — that is not your responsibility.
 - The "visual" field is optional; omit it if the user does not specify it.
@@ -43,3 +43,15 @@ User: "max-heap inserting 5, 3, 7, 1, 9, 2"
 
 User: "BST with insertions 8, 3, 10, 1, 6, 14, 4, 7"
 {"type":"tree","subtype":"bst","operations":[{"op":"insert","values":[8,3,10,1,6,14,4,7]}]}
+
+User: "stack with elements 3, 42, 8, 17 (17 on top)"
+{"type":"stack","values":[3,42,8,17]}
+
+User: "una pila con 4, 8, 15"
+{"type":"stack","values":[4,8,15]}
+
+User: "queue with 5, 9, 1, 14 where 5 is at the front"
+{"type":"queue","values":[5,9,1,14]}
+
+User: "una cola con los elementos 2, 7, 11"
+{"type":"queue","values":[2,7,11]}
