@@ -15,9 +15,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * Generación por tipo de estructura, sin modelo: el JSON de cada caso es lo que el modelo responde
@@ -28,17 +25,11 @@ import org.springframework.test.context.TestPropertySource;
  * que <b>ningún par de nodos comparte posición</b>. Esto último es determinista y es lo que la
  * llamada real al modelo no puede garantizar.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@TestPropertySource(
-    properties = {
-      "gemini.api.key=test-key-no-usada",
-      "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration"
-    })
 class GenerationPipelineTest {
 
-  @Autowired private ContractBuilder builder;
-  @Autowired private GeneratorDispatcher generators;
-  @Autowired private LayoutDispatcher layouts;
+  private final ContractBuilder builder = PipelineFixtures.contractBuilder();
+  private final GeneratorDispatcher generators = PipelineFixtures.generators();
+  private final LayoutDispatcher layouts = PipelineFixtures.layouts();
 
   private StructureResponse run(String json) {
     var contract = builder.build(json);

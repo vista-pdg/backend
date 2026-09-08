@@ -2,38 +2,43 @@ package com.vista.pdg.service.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.vista.pdg.config.GeminiProperties;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.model.generated.GeneratedStructure;
+import com.vista.pdg.service.PipelineFixtures;
 import com.vista.pdg.service.generator.impl.GeneratorDispatcher;
 import com.vista.pdg.service.llm.def.LlmAdapter;
+import com.vista.pdg.service.llm.impl.GeminiLlmAdapter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * Prueba <b>viva</b> contra Gemini, una instrucción por tipo de estructura. No es determinista y
  * consume créditos, así que no corre en CI ni en {@code make test}: sólo con
  *
- * <pre>GEMINI_LIVE_TESTS=true ./mvnw -Dtest=GeminiLiveGenerationTest test</pre>
+ * <pre>
+ * set -a; source .env; set +a; GEMINI_LIVE_TESTS=true ./mvnw -Dtest=GeminiLiveGenerationTest test
+ * </pre>
  *
  * <p>Lo que afirma es lo que sí debe ser estable pase lo que pase con la redacción del modelo: el
  * tipo pedido y el número de nodos que el usuario dictó. La forma exacta del JSON la absorbe el
  * normalizador (probado en {@code ContractNormalizerTest}).
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@TestPropertySource(
-    properties = {
-      "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration"
-    })
 @EnabledIfEnvironmentVariable(named = "GEMINI_LIVE_TESTS", matches = "true")
 class GeminiLiveGenerationTest {
 
-  @Autowired private LlmAdapter llm;
-  @Autowired private GeneratorDispatcher generators;
+  /** Clave y modelo del entorno (los mismos que {@code backend/.env}); sin contexto de Spring. */
+  private final LlmAdapter llm =
+      new GeminiLlmAdapter(
+          new GeminiProperties(
+              new GeminiProperties.Api(
+                  System.getenv().getOrDefault("GEMINI_API_KEY", "change-me"),
+                  System.getenv().getOrDefault("GEMINI_API_MODEL", "gemini-2.1-flash-lite"))),
+          PipelineFixtures.contractBuilder());
+
+  private final GeneratorDispatcher generators = PipelineFixtures.generators();
 
   @ParameterizedTest(name = "{0} → {1} con {2} nodos")
   @CsvSource(

@@ -85,6 +85,7 @@ El modelo no es determinista, así que la cadena que lo rodea sí lo es:
 verdad (consume créditos, no corre en CI):
 
 ```bash
+set -a; source .env; set +a
 GEMINI_LIVE_TESTS=true ./mvnw -Dtest=GeminiLiveGenerationTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
