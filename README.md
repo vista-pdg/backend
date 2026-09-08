@@ -183,6 +183,16 @@ La cuota por curso la fija el administrador con `PUT /api/admin/courses/{code}/q
 (`GET /api/admin/courses/{code}/quota-history`). El cambio aplica de inmediato a todos los
 estudiantes del curso; la ráfaga no descuenta cuota.
 
+### Errores de la API
+
+Un cuerpo que no se puede leer —JSON roto, un campo primitivo ausente— responde **400** con
+`MALFORMED_REQUEST` y el campo culpable en notación `nodes[0].x`, tanto en el mensaje como en
+`fieldErrors`. Es un error de quien llama, no del servidor.
+
+Lo que no se sabe clasificar responde 500 con un mensaje fijo. **El mensaje de la excepción no viaja
+al cliente**: llegaba a incluir la consulta SQL completa con sus nombres de columnas, que es un plano
+de la base de datos regalado a cualquiera que provoque un fallo. Queda en el log, que es donde sirve.
+
 ## Pruebas
 
 ```bash
