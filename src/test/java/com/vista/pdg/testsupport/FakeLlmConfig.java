@@ -1,5 +1,7 @@
 package com.vista.pdg.testsupport;
 
+import com.vista.pdg.exception.LlmExhaustedException;
+import com.vista.pdg.exception.LlmUnavailableException;
 import com.vista.pdg.model.contract.GraphContract;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.service.llm.def.ConversationContext;
@@ -46,6 +48,14 @@ public class FakeLlmConfig {
       public StructureContract generate(String userPrompt, ConversationContext context) {
         CALLS.incrementAndGet();
         LAST_CONTEXT.set(context);
+        // HU-21 · CA-3: dos marcadores para provocar los dos finales que no son éxito.
+        String prompt = userPrompt == null ? "" : userPrompt.toLowerCase();
+        if (prompt.contains("fuera de alcance")) {
+          throw new LlmExhaustedException("No se pudo generar un contrato válido", List.of());
+        }
+        if (prompt.contains("proveedor caido")) {
+          throw new LlmUnavailableException("El proveedor no respondió", null);
+        }
         return new GraphContract(
             "graph",
             null,

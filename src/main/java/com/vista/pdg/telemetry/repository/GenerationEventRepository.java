@@ -2,8 +2,10 @@ package com.vista.pdg.telemetry.repository;
 
 import com.vista.pdg.telemetry.entity.GenerationEvent;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface GenerationEventRepository extends JpaRepository<GenerationEvent, Long> {
 
@@ -38,4 +40,26 @@ public interface GenerationEventRepository extends JpaRepository<GenerationEvent
 
   @Query("select count(distinct e.pseudonym) from GenerationEvent e")
   long countDistinctPseudonyms();
+
+  /**
+   * HU-21 · CA-4: candidatos a secuencia de reintento — misma sesión y mismo tipo de estructura con
+   * al menos {@code minAttempts} eventos. La ventana temporal se filtra fuera, con las marcas que
+   * devuelve esta consulta: en JPQL sería una comparación entre agregados difícil de leer.
+   */
+  @Query(
+      "select e.sessionId, e.structureType, count(e), min(e.createdAt), max(e.createdAt) "
+          + "from GenerationEvent e where e.sessionId is not null "
+          + "group by e.sessionId, e.structureType having count(e) >= :minAttempts "
+          + "order by count(e) desc")
+  List<Object[]> groupBySessionAndStructure(@Param("minAttempts") long minAttempts);
+
+  List<GenerationEvent> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+  /**
+   * HU-21: los últimos eventos, para revisión docente. Sin filtro cuando {@code outcome} es nulo.
+   */
+  @Query(
+      "select e from GenerationEvent e where (:outcome is null or e.outcome = :outcome) "
+          + "order by e.createdAt desc")
+  List<GenerationEvent> findRecent(@Param("outcome") String outcome, Pageable pageable);
 }

@@ -89,7 +89,7 @@ class VisualizationModeTelemetryTest extends IntegrationTestSupport {
     GenerationEvent ev = lastEventOf(s);
     assertThat(ev.getKind()).isEqualTo(TelemetryService.KIND_ALGORITHM);
     assertThat(ev.getVisualizationMode()).as("se normaliza a mayúsculas").isEqualTo("3D");
-    assertThat(ev.getStructureType()).isEqualTo("tree");
+    assertThat(ev.getStructureType()).as("HU-21: tipo detallado").isEqualTo("arbol_avl");
     assertThat(ev.getSubtype()).isEqualTo("avl");
     assertThat(ev.getNodeCount()).as("nodos del estado final del rastro").isEqualTo(3);
     assertThat(ev.getCourseCode()).isEqualTo("CEDI-G1");

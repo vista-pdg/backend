@@ -2,6 +2,7 @@ package com.vista.pdg.service.llm.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vista.pdg.exception.UnsupportedStructureException;
 import com.vista.pdg.model.contract.GraphContract;
 import com.vista.pdg.model.contract.QueueContract;
 import com.vista.pdg.model.contract.StackContract;
@@ -60,6 +61,14 @@ public class StubLlmAdapter implements LlmAdapter {
       Pattern.compile("\\b(inserta|insertar|agrega|a[ñn]ade|insert|add)\\b");
 
   private static final Pattern DIRECTED = Pattern.compile("\\b(dirigido|directed)\\b");
+
+  /**
+   * HU-21 · CA-3: estructuras que el syllabus no cubre. El modelo real acabaría agotando los
+   * intentos o produciendo un contrato que el validador rechaza; el stub lo resuelve de una vez y
+   * de forma determinista para que el escenario de «fuera de alcance» se pueda probar sin Gemini.
+   */
+  private static final Pattern OUT_OF_SYLLABUS =
+      Pattern.compile("\\b(trie|rojinegro|rojo-negro|b\\+|skip ?list|fractal|hiperb[oó]lico)\\b");
 
   /**
    * Refinamiento determinista (HU-32). Con una estructura vigente en la sesión, el stub aplica los
@@ -153,6 +162,10 @@ public class StubLlmAdapter implements LlmAdapter {
   @Override
   public StructureContract generate(String userPrompt) {
     String lower = userPrompt == null ? "" : userPrompt.toLowerCase();
+    if (OUT_OF_SYLLABUS.matcher(lower).find()) {
+      throw new UnsupportedStructureException(
+          "La estructura solicitada no está contemplada en el syllabus");
+    }
     // HU-32: «árbol con inserción de 1, 2, 3» — el stub también cubre la familia de árboles.
     if (TREE.matcher(lower).find()) {
       String subtype = lower.contains("avl") ? "avl" : "bst";

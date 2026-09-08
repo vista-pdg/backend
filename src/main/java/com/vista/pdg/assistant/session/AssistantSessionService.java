@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -88,13 +89,51 @@ public class AssistantSessionService {
         turns = new ArrayList<>(turns.subList(turns.size() - maxTurns, turns.size()));
 
       AssistantSession session =
-          new AssistantSession(contractJson, structureType, turns, Instant.now().toString());
+          new AssistantSession(
+              previous.sessionId() == null ? newSessionId() : previous.sessionId(),
+              contractJson,
+              structureType,
+              turns,
+              Instant.now().toString());
       redis.opsForValue().set(key(userId), mapper.writeValueAsString(session), ttl);
       return true;
     } catch (Exception e) {
       log.warn("No se pudo guardar la sesión del asistente ({}): {}", userId, e.getMessage());
       return false;
     }
+  }
+
+  /**
+   * Identificador de la sesión de trabajo (HU-21 · CA-4). Si no hay sesión se abre una vacía: un
+   * evento de telemetría no debería quedarse sin agrupar sólo porque el estudiante todavía no ha
+   * generado nada. Devuelve {@code null} si Redis no responde, que es lo que la columna guarda.
+   */
+  public String ensureSessionId(Long userId) {
+    try {
+      AssistantSession session = load(userId);
+      if (session.sessionId() != null) {
+        // Tocar la sesión renueva su caducidad, igual que un mensaje.
+        redis.expire(key(userId), ttl);
+        return session.sessionId();
+      }
+      String id = newSessionId();
+      AssistantSession opened =
+          new AssistantSession(
+              id,
+              session.contract(),
+              session.structureType(),
+              session.turns(),
+              Instant.now().toString());
+      redis.opsForValue().set(key(userId), mapper.writeValueAsString(opened), ttl);
+      return id;
+    } catch (Exception e) {
+      log.warn("No se pudo abrir la sesión del asistente ({}): {}", userId, e.getMessage());
+      return null;
+    }
+  }
+
+  private static String newSessionId() {
+    return UUID.randomUUID().toString();
   }
 
   /** Borrado explícito («Limpiar»). Devuelve {@code false} sólo si Redis falló. */

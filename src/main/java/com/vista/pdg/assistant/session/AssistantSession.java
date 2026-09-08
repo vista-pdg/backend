@@ -14,10 +14,13 @@ import java.util.List;
  * <p>{@code updatedAt} es una marca ISO-8601 en texto, no un {@code Instant}: lo que se guarda en
  * Redis debe poder leerse con {@code redis-cli} y deserializarse sin depender de qué módulos de
  * Jackson tenga registrados la aplicación.
+ *
+ * <p>{@code sessionId} (HU-21) identifica la sesión de trabajo en el registro analítico: agrupa los
+ * reintentos y desaparece con ella.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AssistantSession(
-    String contract, String structureType, List<Turn> turns, String updatedAt) {
+    String sessionId, String contract, String structureType, List<Turn> turns, String updatedAt) {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Turn(String role, String text) {}
@@ -27,7 +30,7 @@ public record AssistantSession(
   }
 
   public static AssistantSession empty() {
-    return new AssistantSession(null, null, List.of(), null);
+    return new AssistantSession(null, null, null, List.of(), null);
   }
 
   public boolean hasStructure() {

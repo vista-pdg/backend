@@ -42,6 +42,11 @@ public class GenerationEvent {
   @Column(length = 16)
   private String termCode;
 
+  /**
+   * HU-21: en el esquema v2 es el tipo <b>detallado</b> en español ({@code grafo_no_dirigido},
+   * {@code arbol_avl}…). Las filas v1 (HU-16/18) guardan el tipo grueso del contrato ({@code
+   * graph}); {@code schemaVersion} dice cómo leerlas.
+   */
   @Column(nullable = false, length = 32)
   private String structureType;
 
@@ -56,7 +61,7 @@ public class GenerationEvent {
    * para una ejecución paso a paso. Nulo en filas anteriores a la HU-18, que eran todas
    * generaciones; las consultas lo tratan como tal.
    */
-  @Column(length = 16)
+  @Column(length = 24)
   private String kind;
 
   /**
@@ -65,6 +70,51 @@ public class GenerationEvent {
    */
   @Column(length = 4)
   private String visualizationMode;
+
+  /** HU-21: algoritmo ejecutado ({@code BFS}, {@code inorder}…). Nulo en las generaciones. */
+  @Column(length = 48)
+  private String algorithm;
+
+  /** HU-21: {@code asistente_nlp} o {@code catalogo_algoritmos}. */
+  @Column(length = 32)
+  private String interactionSource;
+
+  /** HU-21: {@code exito}, {@code fuera_de_alcance} o {@code error}. */
+  @Column(length = 24)
+  private String outcome;
+
+  /**
+   * HU-21 · CA-4: sesión de trabajo (la de HU-32) bajo la que ocurrió la interacción. Agrupa los
+   * reintentos. Nulo si la sesión no estaba disponible.
+   */
+  @Column(length = 36)
+  private String sessionId;
+
+  /** HU-21 · CA-2: pasos del rastro; en los eventos que reporta el cliente, los recorridos. */
+  private Integer stepCount;
+
+  /**
+   * HU-21 · CA-3: instrucción del estudiante, <b>sólo</b> cuando el resultado no fue éxito, para
+   * revisión docente. En los éxitos no se guarda: sería contenido almacenado sin necesidad (R03).
+   */
+  @Column(length = 500)
+  private String promptText;
+
+  /**
+   * Versión del esquema del evento: 2 desde HU-21. Las filas escritas antes son de la v1 y llegan
+   * con {@code null}, que es lo que hay que leer como «uno».
+   *
+   * <p>Es {@code Integer} y la columna admite nulos a propósito. Con {@code ddl-auto=update} y una
+   * tabla que ya tiene filas, añadir una columna {@code not null} sin valor por defecto falla en
+   * silencio y deja el esquema a medias; con nulos, la columna aparece y las filas viejas dicen la
+   * verdad: se escribieron sin versión.
+   */
+  @Builder.Default private Integer schemaVersion = 2;
+
+  /** La versión efectiva: sin valor guardado, la fila es de la v1. */
+  public int effectiveSchemaVersion() {
+    return schemaVersion == null ? 1 : schemaVersion;
+  }
 
   @Column(nullable = false)
   @Builder.Default

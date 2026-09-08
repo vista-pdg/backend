@@ -28,6 +28,16 @@ class StubRefinementTest {
   }
 
   @Test
+  @DisplayName("HU-21 · CA-3: lo que no está en el syllabus se rechaza en vez de inventarse")
+  void outOfSyllabusIsRejected() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> stub.generate("un arbol rojinegro"))
+        .isInstanceOf(com.vista.pdg.exception.UnsupportedStructureException.class)
+        .hasMessageContaining("syllabus");
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> stub.generate("una trie de prefijos"))
+        .isInstanceOf(com.vista.pdg.exception.UnsupportedStructureException.class);
+  }
+
+  @Test
   @DisplayName("sin contexto genera la estructura descrita, incluidos árboles")
   void generatesFromScratch() {
     StructureContract tree = stub.generate("Genera un arbol con insercion de 1, 2, 3, 5, 6");
