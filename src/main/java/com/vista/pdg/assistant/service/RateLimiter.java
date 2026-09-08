@@ -51,8 +51,10 @@ public class RateLimiter {
         window.addLast(now);
         return OptionalLong.empty();
       }
-      long wait = Duration.between(now, window.peekFirst().plus(WINDOW)).toSeconds();
-      return OptionalLong.of(Math.max(1, wait));
+      // Hacia arriba: un Retry-After que se quede corto haría que el cliente reintentara un
+      // instante antes de tiempo y recibiera otro 429.
+      long millis = Duration.between(now, window.peekFirst().plus(WINDOW)).toMillis();
+      return OptionalLong.of(Math.max(1, (millis + 999) / 1000));
     }
   }
 

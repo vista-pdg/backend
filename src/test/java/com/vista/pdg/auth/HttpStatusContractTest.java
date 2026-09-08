@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
+import com.vista.pdg.testsupport.FakeLlmConfig;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -34,6 +36,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * lleva a ninguna parte.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(FakeLlmConfig.class)
 @TestPropertySource(
     properties = {
       "gemini.api.key=test-key-no-usada",
@@ -61,6 +64,8 @@ class HttpStatusContractTest {
   @LocalServerPort private int port;
 
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private com.vista.pdg.academic.repository.CourseRepository courseRepository;
+  @Autowired private com.vista.pdg.academic.repository.AcademicTermRepository termRepository;
 
   private final HttpClient client =
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -160,6 +165,104 @@ class HttpStatusContractTest {
     assertThat(statusOf("GET", "/api/analytics/summary", student, null)).isEqualTo(403);
     assertThat(statusOf("GET", "/api/analytics/summary", teacher, null)).isEqualTo(200);
     assertThat(statusOf("GET", "/api/analytics/summary", null, null)).isEqualTo(401);
+  }
+
+  // ── HU-17 ────────────────────────────────────────────────────────────────
+
+  private HttpResponse<String> send(String method, String path, String bearer, String body) {
+    try {
+      HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url(path)));
+      if (bearer != null) req.header("Authorization", "Bearer " + bearer);
+      if ("GET".equals(method)) req.GET();
+      else
+        req.header("Content-Type", "application/json")
+            .method(method, HttpRequest.BodyPublishers.ofString(body == null ? "{}" : body));
+      return client.send(req.build(), HttpResponse.BodyHandlers.ofString());
+    } catch (Exception e) {
+      throw new IllegalStateException("Falló " + method + " " + path, e);
+    }
+  }
+
+  private String registerStudentToken(String prefix) {
+    return registerStudentToken(prefix, "CEDI-G1");
+  }
+
+  private String registerStudentToken(String prefix, String courseCode) {
+    String email = prefix + "." + System.nanoTime() + "@u.icesi.edu.co";
+    String body =
+        "{\"displayName\":\"HTTP\",\"email\":\""
+            + email
+            + "\",\"password\":\"clave12345\",\"confirmPassword\":\"clave12345\",\"courseCode\":\""
+            + courseCode
+            + "\"}";
+    HttpResponse<String> res = send("POST", "/api/auth/register", null, body);
+    assertThat(res.statusCode()).isEqualTo(201);
+    try {
+      return objectMapper.readValue(res.body(), AuthResponse.class).accessToken();
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * HU-17 CA-3 con el límite real (5/min): el servidor real es el único sitio donde la cabecera
+   * Retry-After se puede comprobar tal y como la ve el cliente.
+   */
+  @Test
+  @DisplayName("HU-17 CA-3: el 6.º mensaje en un minuto responde 429 con Retry-After")
+  void rafagaDevuelve429ConRetryAfter() {
+    String token = registerStudentToken("rafaga");
+    for (int i = 1; i <= 5; i++) {
+      assertThat(send("POST", "/api/generate", token, "{\"prompt\":\"K3\"}").statusCode())
+          .as("mensaje " + i)
+          .isEqualTo(200);
+    }
+    HttpResponse<String> sixth = send("POST", "/api/generate", token, "{\"prompt\":\"K3\"}");
+    assertThat(sixth.statusCode()).isEqualTo(429);
+    assertThat(sixth.body()).contains("RATE_LIMITED");
+    String retryAfter = sixth.headers().firstValue("Retry-After").orElseThrow();
+    assertThat(Long.parseLong(retryAfter)).isBetween(1L, 60L);
+  }
+
+  /**
+   * HU-17 CA-2 por HTTP, con la cuota de un curso propio bajada a 1 por ADMIN: el 2.º mensaje del
+   * estudiante responde 429 con el literal y las cabeceras que el cliente usa para pintar el
+   * estado.
+   */
+  @Test
+  @DisplayName("HU-17 CA-2: cuota agotada responde 429 con el literal y X-Quota-Reset")
+  void cuotaAgotadaPorHttp() {
+    var term = termRepository.findFirstByActiveTrue().orElseThrow();
+    courseRepository
+        .findByCode("CEDI-H1")
+        .orElseGet(
+            () ->
+                courseRepository.save(
+                    com.vista.pdg.academic.entity.Course.builder()
+                        .code("CEDI-H1")
+                        .name("Curso HTTP con cuota 1")
+                        .term(term)
+                        .build()));
+    String admin = accessTokenOf("admin@vista.com", "admin123");
+    assertThat(
+            send("PUT", "/api/admin/courses/CEDI-H1/quota", admin, "{\"dailyQuota\":1}")
+                .statusCode())
+        .isEqualTo(200);
+
+    String token = registerStudentToken("agotada", "CEDI-H1");
+
+    HttpResponse<String> first = send("POST", "/api/generate", token, "{\"prompt\":\"K3\"}");
+    assertThat(first.statusCode()).isEqualTo(200);
+    assertThat(first.headers().firstValue("X-Quota-Limit")).contains("1");
+    assertThat(first.headers().firstValue("X-Quota-Remaining")).contains("0");
+
+    HttpResponse<String> second = send("POST", "/api/generate", token, "{\"prompt\":\"K3\"}");
+    assertThat(second.statusCode()).isEqualTo(429);
+    assertThat(second.body())
+        .contains("DAILY_QUOTA_EXCEEDED")
+        .contains("Alcanzaste tu límite diario. Se restablece a medianoche.");
+    assertThat(second.headers().firstValue("X-Quota-Remaining")).contains("0");
+    assertThat(second.headers().firstValue("X-Quota-Reset")).isPresent();
   }
 
   @Test
