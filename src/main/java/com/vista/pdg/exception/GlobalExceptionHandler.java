@@ -105,6 +105,14 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(503).body(StructureResponse.error(ex.getMessage(), ex.attempts()));
   }
 
+  /**
+   * Créditos, cuota o clave del proveedor: 503 con el motivo, sin reintentos ni detalle interno.
+   */
+  @ExceptionHandler(LlmUnavailableException.class)
+  public ResponseEntity<StructureResponse> handleLlmUnavailable(LlmUnavailableException ex) {
+    return ResponseEntity.status(503).body(StructureResponse.error(ex.getMessage(), null));
+  }
+
   @ExceptionHandler(UnsupportedStructureException.class)
   public ResponseEntity<StructureResponse> handleUnsupported(UnsupportedStructureException ex) {
     return ResponseEntity.badRequest().body(StructureResponse.error(ex.getMessage(), null));

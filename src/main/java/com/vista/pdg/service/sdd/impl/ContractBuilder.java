@@ -10,15 +10,20 @@ public class ContractBuilder {
 
   private final ObjectMapper mapper;
   private final ContractValidator validator;
+  private final ContractNormalizer normalizer;
 
-  public ContractBuilder(ObjectMapper mapper, ContractValidator validator) {
+  public ContractBuilder(
+      ObjectMapper mapper, ContractValidator validator, ContractNormalizer normalizer) {
     this.mapper = mapper;
     this.validator = validator;
+    this.normalizer = normalizer;
   }
 
+  /** Normaliza (formas laxas → contrato estricto), deserializa y valida. */
   public StructureContract build(String json) {
     try {
-      StructureContract contract = mapper.readValue(json, StructureContract.class);
+      StructureContract contract =
+          mapper.readValue(normalizer.normalize(json), StructureContract.class);
       validator.validate(contract);
       return contract;
 
