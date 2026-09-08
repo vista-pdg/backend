@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
 import com.vista.pdg.auth.dto.RegisterRequest;
+import com.vista.pdg.testsupport.FakeLlmConfig;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -29,6 +31,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(FakeLlmConfig.class)
 @TestPropertySource(
     properties = {
       // Evita que el arranque del contexto dependa de un .env con clave real de Gemini.
