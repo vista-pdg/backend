@@ -68,6 +68,30 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(401).body(ApiError.of("BAD_CREDENTIALS", ex.getMessage()));
   }
 
+  // ── Cuota y límite de tasa del asistente (HU-17) ────────────────────────
+
+  @ExceptionHandler(DailyQuotaExceededException.class)
+  public ResponseEntity<ApiError> handleDailyQuota(DailyQuotaExceededException ex) {
+    return ResponseEntity.status(429)
+        .header("X-Quota-Remaining", "0")
+        .header("X-Quota-Reset", ex.resetsAt().toString())
+        .body(ApiError.of("DAILY_QUOTA_EXCEEDED", ex.getMessage()));
+  }
+
+  /** {@code Retry-After} en segundos: es lo que el cliente usa para la cuenta regresiva (CA-3). */
+  @ExceptionHandler(RateLimitedException.class)
+  public ResponseEntity<ApiError> handleRateLimited(RateLimitedException ex) {
+    return ResponseEntity.status(429)
+        .header("Retry-After", String.valueOf(ex.retryAfterSeconds()))
+        .body(ApiError.of("RATE_LIMITED", ex.getMessage()));
+  }
+
+  @ExceptionHandler(
+      com.vista.pdg.assistant.service.CourseQuotaService.CourseNotFoundException.class)
+  public ResponseEntity<ApiError> handleCourseNotFound(RuntimeException ex) {
+    return ResponseEntity.status(404).body(ApiError.of("COURSE_NOT_FOUND", ex.getMessage()));
+  }
+
   // ── Generación de estructuras ───────────────────────────────────────────
 
   @ExceptionHandler(InvalidContractException.class)

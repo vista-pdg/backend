@@ -20,7 +20,7 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 |---|---|---|
 | `dev` (defecto) | desarrollo local | logs en DEBUG |
 | `prod` | despliegue | logs en INFO/WARN |
-| `e2e` | Cypress y CI | `/api/generate` responde un grafo fijo (`StubLlmAdapter`): sin clave de Gemini, sin red, sin cuota. Arrancar con él deja una advertencia en el log. |
+| `e2e` | Cypress y CI | `/api/generate` responde un grafo fijo (`StubLlmAdapter`): sin clave de Gemini, sin red, sin consumo facturable. La cuota diaria y el límite de tasa **sí** aplican (los prueba Cypress). Arrancar con él deja una advertencia en el log. |
 
 `SPRING_PROFILES_ACTIVE=e2e make run`
 
@@ -37,6 +37,10 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 | `AUTH_ALLOWED_EMAIL_DOMAINS` | `u.icesi.edu.co,icesi.edu.co` | vacío = cualquier dominio |
 | `AUTH_MIN_PASSWORD_LENGTH` | `8` | |
 | `TELEMETRY_PSEUDONYM_SECRET` | valor de desarrollo | **cámbialo en despliegue**; independiente de `JWT_SECRET` a propósito |
+| `ASSISTANT_DAILY_QUOTA` | `40` | cuota diaria por estudiante para cursos sin cuota propia |
+| `ASSISTANT_WARNING_RATIO` | `0.2` | aviso preventivo cuando restan ≤ ⌈límite·ratio⌉ mensajes |
+| `ASSISTANT_RATE_PER_MINUTE` | `5` | ráfaga máxima por usuario en una ventana deslizante de 60 s |
+| `ASSISTANT_TIMEZONE` | `America/Bogota` | zona en la que se cuenta el «día» y se reinicia la cuota a las 00:00 |
 
 ## Módulos
 
@@ -45,6 +49,7 @@ auth/        registro, login, par de tokens con detección de reuso, roles STUDE
 academic/    periodos académicos y cursos; GET /api/courses (público)
 telemetry/   eventos de generación seudonimizados; GET /api/analytics/summary (solo TEACHER)
 security/    JwtAuthFilter, 401 sin autenticación / 403 con rol insuficiente
+assistant/   cuota diaria por estudiante, límite de tasa, cuota por curso (ADMIN) con auditoría
 service/     LLM → contrato → validación → generador → layout 3D
 seeder/      idempotente; migra USER→STUDENT, siembra periodo activo y curso CEDI-G1
 ```
@@ -60,6 +65,25 @@ familia. Cada rotación consume su eslabón; presentar uno ya rotado revoca la f
 `TELEMETRY_PSEUDONYM_SECRET`, truncado a 64 bits), el código de curso, el periodo, el tipo de
 estructura y la fecha. **Sin clave foránea al usuario, sin correo, sin nombre.** HMAC y no un hash
 simple porque los ids son pequeños y secuenciales: con SHA-256 a secas bastaría probar 1, 2, 3…
+
+### Cuota del asistente (HU-17)
+
+Cada `POST /api/generate` **reserva** antes de llamar al modelo: primero el contador diario
+(`assistant_usage`, una fila por usuario y día calendario en `ASSISTANT_TIMEZONE`, incrementada con
+`UPDATE … WHERE count < :limit` para que dos peticiones simultáneas no pasen del límite), luego la
+ventana de ráfaga en memoria (`RateLimiter`, por instancia). Si algo falla no se toca Gemini:
+
+| Situación | Estado | Código | Cabeceras |
+|---|---|---|---|
+| dentro de límites | 200 | — | `X-Quota-Limit`, `X-Quota-Remaining`, `X-Quota-Reset` |
+| cuota diaria agotada | 429 | `DAILY_QUOTA_EXCEEDED` (mensaje literal de la HU) | `X-Quota-Remaining: 0`, `X-Quota-Reset` |
+| más de 5 en un minuto | 429 | `RATE_LIMITED` | `Retry-After` (segundos, redondeado hacia arriba) |
+
+`GET /api/assistant/quota` devuelve el estado (`limit`, `used`, `remaining`, `resetsAt`, `warning`).
+La cuota por curso la fija el administrador con `PUT /api/admin/courses/{code}/quota`
+(1–1000) y queda en `quota_changes` con autor, valores y marca de tiempo
+(`GET /api/admin/courses/{code}/quota-history`). El cambio aplica de inmediato a todos los
+estudiantes del curso; la ráfaga no descuenta cuota.
 
 ## Pruebas
 
@@ -77,4 +101,4 @@ pisaba el 403.
 `.github/workflows/ci.yml`: Spotless → `verify` → E2E. El E2E es el flujo reutilizable
 `vista-pdg/dev-workflow/.github/workflows/e2e.yml`, que levanta este backend con el frontend de
 `main` y corre Cypress en Chromium y Firefox. Requiere el secreto de organización
-**`VISTA_REPO_TOKEN`** (PAT de solo lectura sobre `backend` y `frontend`, que son privados).
+**`VISTA_REPO_TOKEN`** (PAT de solo lectura sobre `backend` y `frontend`).

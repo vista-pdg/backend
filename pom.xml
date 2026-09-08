@@ -158,6 +158,7 @@
 							     regla vacia: una puerta que no puede fallar. Por eso el filtro va aqui. -->
 							<includes>
 								<include>com/vista/pdg/academic/**</include>
+								<include>com/vista/pdg/assistant/**</include>
 								<include>com/vista/pdg/telemetry/**</include>
 								<include>com/vista/pdg/security/**</include>
 								<include>com/vista/pdg/seeder/**</include>

@@ -5,6 +5,7 @@ import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
 import com.vista.pdg.auth.dto.RegisterRequest;
 import com.vista.pdg.testsupport.FakeLlmConfig;
+import com.vista.pdg.testsupport.MutableClockConfig;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,13 +32,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(FakeLlmConfig.class)
+@Import({FakeLlmConfig.class, MutableClockConfig.class})
 @TestPropertySource(
     properties = {
       // Evita que el arranque del contexto dependa de un .env con clave real de Gemini.
       "gemini.api.key=test-key-no-usada",
       "auth.allowed-email-domains=u.icesi.edu.co,icesi.edu.co",
       "auth.min-password-length=8",
+      // El limitador de tasa se prueba aparte con su propio reloj. Aquí se sube para que las suites
+      // que generan varias veces seguidas con la misma cuenta (telemetría) no choquen con él.
+      "assistant.rate.per-minute=1000",
       "spring.jpa.hibernate.ddl-auto=update"
     })
 public abstract class IntegrationTestSupport {
