@@ -28,8 +28,10 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 
 | Variable | Defecto | Notas |
 |---|---|---|
-| `GEMINI_API_KEY` | — | obligatoria fuera de `e2e` |
-| `GEMINI_API_MODEL` | `gemini-2.1-flash-lite` | |
+| `GEMINI_API_KEY` | — | clave de AI Studio; obligatoria fuera de `e2e` salvo con `GEMINI_VERTEX=true` |
+| `GEMINI_API_MODEL` | `gemini-3.5-flash-lite` | |
+| `GEMINI_VERTEX` | `false` | `true` = usar Vertex AI con credenciales de Google Cloud (ADC) y la facturación del proyecto, en vez del monedero prepago de AI Studio |
+| `GEMINI_PROJECT` / `GEMINI_LOCATION` | — / `global` | proyecto y región de Vertex AI (sólo con `GEMINI_VERTEX=true`) |
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | compose local | |
 | `JWT_SECRET` | valor de desarrollo | **cámbialo en despliegue** (≥ 32 caracteres) |
 | `JWT_ACCESS_EXPIRATION` | `900000` ms (15 min) | token de acceso, JWT, no revocable |
@@ -87,6 +89,21 @@ verdad (consume créditos, no corre en CI):
 ```bash
 set -a; source .env; set +a
 GEMINI_LIVE_TESTS=true ./mvnw -Dtest=GeminiLiveGenerationTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+#### Si AI Studio responde «prepayment credits are depleted»
+
+Ese 429 es el **monedero prepago del proyecto de AI Studio** (https://ai.studio/projects → Billing),
+independiente de la cuenta de facturación de Google Cloud. Opciones: recargar ahí, o usar Vertex AI
+con la facturación de Cloud (créditos de prueba incluidos):
+
+```bash
+gcloud auth application-default login
+gcloud services enable aiplatform.googleapis.com --project TU_PROYECTO
+# backend/.env
+GEMINI_VERTEX=true
+GEMINI_PROJECT=TU_PROYECTO
+GEMINI_LOCATION=global
 ```
 
 ### Cuota del asistente (HU-17)

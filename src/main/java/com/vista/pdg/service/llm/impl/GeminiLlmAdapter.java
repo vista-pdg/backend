@@ -23,14 +23,31 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
 
   public GeminiLlmAdapter(GeminiProperties geminiProperties, ContractBuilder contractBuilder) {
     super(contractBuilder);
-    String key = geminiProperties.api().key();
-    this.model = geminiProperties.api().model();
-    log.info(
-        "GeminiLlmAdapter init — model: {}, key: {}***{}",
-        model,
-        key.length() > 8 ? key.substring(0, 4) : "????",
-        key.length() > 8 ? key.substring(key.length() - 4) : "????");
-    this.client = Client.builder().apiKey(key).build();
+    GeminiProperties.Api api = geminiProperties.api();
+    this.model = api.model();
+    if (api.vertex()) {
+      if (api.project() == null || api.project().isBlank()) {
+        throw new IllegalStateException(
+            "gemini.api.vertex=true requiere gemini.api.project (GEMINI_PROJECT)");
+      }
+      String location =
+          api.location() == null || api.location().isBlank() ? "global" : api.location();
+      log.info(
+          "GeminiLlmAdapter init — Vertex AI, model: {}, project: {}, location: {} (credenciales ADC)",
+          model,
+          api.project(),
+          location);
+      this.client =
+          Client.builder().vertexAI(true).project(api.project()).location(location).build();
+    } else {
+      String key = api.key() == null ? "" : api.key();
+      log.info(
+          "GeminiLlmAdapter init — AI Studio, model: {}, key: {}***{}",
+          model,
+          key.length() > 8 ? key.substring(0, 4) : "????",
+          key.length() > 8 ? key.substring(key.length() - 4) : "????");
+      this.client = Client.builder().apiKey(key).build();
+    }
   }
 
   @Override

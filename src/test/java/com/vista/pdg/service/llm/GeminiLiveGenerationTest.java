@@ -35,7 +35,10 @@ class GeminiLiveGenerationTest {
           new GeminiProperties(
               new GeminiProperties.Api(
                   System.getenv().getOrDefault("GEMINI_API_KEY", "change-me"),
-                  System.getenv().getOrDefault("GEMINI_API_MODEL", "gemini-2.1-flash-lite"))),
+                  System.getenv().getOrDefault("GEMINI_API_MODEL", "gemini-3.5-flash-lite"),
+                  Boolean.parseBoolean(System.getenv().getOrDefault("GEMINI_VERTEX", "false")),
+                  System.getenv().get("GEMINI_PROJECT"),
+                  System.getenv().getOrDefault("GEMINI_LOCATION", "global"))),
           PipelineFixtures.contractBuilder());
 
   private final GeneratorDispatcher generators = PipelineFixtures.generators();
