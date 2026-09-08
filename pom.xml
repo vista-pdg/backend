@@ -133,6 +133,56 @@
 
 	<build>
 		<plugins>
+			<!-- Cobertura (HU-16 DoD): umbral 80% en los modulos que toca la historia -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.13</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals><goal>prepare-agent</goal></goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals><goal>report</goal></goals>
+					</execution>
+					<execution>
+						<id>check</id>
+						<phase>verify</phase>
+						<goals><goal>check</goal></goals>
+						<configuration>
+							<!-- Filtro de CLASES analizadas: los modulos que toca la HU-16. En un elemento BUNDLE,
+							     includes dentro de <rule> filtra por nombre de bundle, no por paquete, y deja la
+							     regla vacia: una puerta que no puede fallar. Por eso el filtro va aqui. -->
+							<includes>
+								<include>com/vista/pdg/academic/**</include>
+								<include>com/vista/pdg/telemetry/**</include>
+								<include>com/vista/pdg/security/**</include>
+								<include>com/vista/pdg/seeder/**</include>
+								<include>com/vista/pdg/auth/service/AuthService*</include>
+								<include>com/vista/pdg/auth/entity/User*</include>
+								<include>com/vista/pdg/auth/dto/RegisterRequest*</include>
+								<include>com/vista/pdg/auth/dto/AuthResponse*</include>
+								<include>com/vista/pdg/controller/StructureController*</include>
+							</includes>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.80</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<!-- Spotless code formatter -->
 			<plugin>
 				<groupId>com.diffplug.spotless</groupId>

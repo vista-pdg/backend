@@ -1,5 +1,6 @@
 package com.vista.pdg.auth.entity;
 
+import com.vista.pdg.academic.entity.Course;
 import jakarta.persistence.*;
 import java.util.Collection;
 import java.util.HashSet;
@@ -40,6 +41,15 @@ public class User implements UserDetails {
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   @Builder.Default
   private Set<Role> roles = new HashSet<>();
+
+  /**
+   * Curso al que quedó vinculada la cuenta al registrarse. Nulo para docentes, administradores y
+   * cuentas anteriores a la HU-16: el vínculo es obligatorio en el registro de estudiantes, no en
+   * el modelo.
+   */
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "course_id")
+  private Course course;
 
   /** Spring Security uses this as the principal identifier — we use email. */
   @Override

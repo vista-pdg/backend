@@ -127,6 +127,41 @@ class HttpStatusContractTest {
     assertThat(adminUsersStatus(token)).isEqualTo(200);
   }
 
+  // ── HU-16 ────────────────────────────────────────────────────────────────
+
+  private int statusOf(String method, String path, String bearer, String body) {
+    try {
+      HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url(path)));
+      if (bearer != null) req.header("Authorization", "Bearer " + bearer);
+      if ("POST".equals(method)) {
+        req.header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body == null ? "{}" : body));
+      } else {
+        req.GET();
+      }
+      return client.send(req.build(), HttpResponse.BodyHandlers.ofString()).statusCode();
+    } catch (Exception e) {
+      throw new IllegalStateException("Falló " + method + " " + path, e);
+    }
+  }
+
+  @Test
+  @DisplayName("HU-16 CA-3: el asistente anónimo responde 401 en el servidor real")
+  void asistenteAnonimo401() {
+    assertThat(statusOf("POST", "/api/generate", null, "{\"prompt\":\"K3\"}")).isEqualTo(401);
+    assertThat(statusOf("POST", "/api/algorithm/steps", null, null)).isEqualTo(401);
+  }
+
+  @Test
+  @DisplayName("HU-16 CA-4: el estudiante recibe 403 en la analítica y el docente 200")
+  void analiticaSegregadaPorRol() {
+    String student = accessTokenOf("estudiante@u.icesi.edu.co", "estudiante123");
+    String teacher = accessTokenOf("docente@u.icesi.edu.co", "docente123");
+    assertThat(statusOf("GET", "/api/analytics/summary", student, null)).isEqualTo(403);
+    assertThat(statusOf("GET", "/api/analytics/summary", teacher, null)).isEqualTo(200);
+    assertThat(statusOf("GET", "/api/analytics/summary", null, null)).isEqualTo(401);
+  }
+
   @Test
   @DisplayName("un token inválido responde 401 para que el cliente lo refresque")
   void tokenInvalidoDevuelve401() {
