@@ -6,7 +6,7 @@ Spring Boot 4 · Java 21 · PostgreSQL · JWT.
 ## Arranque
 
 ```bash
-docker compose up -d          # Postgres 17 (:5432) y pgAdmin (:5050)
+docker compose up -d          # Postgres 17 (:5432), Redis 8 (:6379) y pgAdmin (:5050)
 cp .env.example .env          # y pon tu GEMINI_API_KEY
 make run                      # http://localhost:8080
 ```
@@ -43,6 +43,9 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 | `ASSISTANT_WARNING_RATIO` | `0.2` | aviso preventivo cuando restan ≤ ⌈límite·ratio⌉ mensajes |
 | `ASSISTANT_RATE_PER_MINUTE` | `5` | ráfaga máxima por usuario en una ventana deslizante de 60 s |
 | `ASSISTANT_TIMEZONE` | `America/Bogota` | zona en la que se cuenta el «día» y se reinicia la cuota a las 00:00 |
+| `ASSISTANT_SESSION_TTL` | `PT30M` | caducidad de la memoria conversacional; se renueva con cada mensaje |
+| `ASSISTANT_SESSION_MAX_TURNS` | `6` | turnos que se conservan como contexto |
+| `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | `REDIS_PORT` gobierna también el mapeo de `compose.yaml`: en una máquina con otro Redis en 6379, cambiarlo aquí basta |
 
 ## Módulos
 
@@ -52,6 +55,7 @@ academic/    periodos académicos y cursos; GET /api/courses (público)
 telemetry/   eventos de generación seudonimizados; GET /api/analytics/summary (solo TEACHER)
 security/    JwtAuthFilter, 401 sin autenticación / 403 con rol insuficiente
 assistant/   cuota diaria por estudiante, límite de tasa, cuota por curso (ADMIN) con auditoría
+  session/   memoria conversacional en Redis: contrato vigente + últimos turnos, con TTL
 service/     LLM → contrato → validación → generador → layout 3D
 seeder/      idempotente; migra USER→STUDENT, siembra periodo activo y curso CEDI-G1
 ```
@@ -106,6 +110,20 @@ GEMINI_PROJECT=TU_PROYECTO
 GEMINI_LOCATION=global
 ```
 
+### Memoria conversacional (HU-32)
+
+El asistente recuerda, durante la sesión de trabajo, la estructura que produjo y los últimos turnos,
+para que el estudiante refine («ahora inserta el 7») en vez de repetir la descripción.
+
+- Vive en Redis: una clave `assistant:session:{userId}` con TTL de 30 minutos que **se renueva con
+  cada mensaje**. Sin correo ni nombre dentro: sólo el contrato y los turnos.
+- Viaja al modelo como un bloque `CURRENT STRUCTURE` / `RECENT TURNS` antes de la instrucción, y la
+  respuesta pasa por el mismo normalizador y validador que una generación nueva.
+- `GET /api/assistant/session` devuelve `{available, active, structureType, secondsRemaining}`;
+  `DELETE` la olvida (lo llama «Limpiar» en el lienzo).
+- **Sin Redis no se rompe nada**: el asistente genera sin contexto y `/api/generate` responde
+  `X-Assistant-Memory: unavailable`, que el frontend convierte en un aviso no bloqueante.
+
 ### Cuota del asistente (HU-17)
 
 Cada `POST /api/generate` **reserva** antes de llamar al modelo: primero el contador diario
@@ -128,7 +146,7 @@ estudiantes del curso; la ráfaga no descuenta cuota.
 ## Pruebas
 
 ```bash
-make test        # unitarias + integración (Testcontainers levanta Postgres)
+make test        # unitarias + integración (Testcontainers levanta Postgres y Redis)
 ./mvnw verify    # además aplica la puerta JaCoCo: 80 % de líneas en los módulos de la HU vigente
 ```
 

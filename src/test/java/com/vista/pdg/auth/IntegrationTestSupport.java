@@ -16,6 +16,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
@@ -52,8 +53,18 @@ public abstract class IntegrationTestSupport {
           .withUsername("vista")
           .withPassword("vista");
 
+  /**
+   * Redis real para la memoria conversacional (HU-32). Se prueba contra el servidor de verdad, no
+   * contra un doble: lo que hay que demostrar —que la clave caduca, que el TTL se renueva, que dos
+   * cuentas no se ven— es comportamiento de Redis, y un mapa en memoria lo daría por bueno sin
+   * probar nada.
+   */
+  static final GenericContainer<?> REDIS =
+      new GenericContainer<>("redis:8-alpine").withExposedPorts(6379);
+
   static {
     POSTGRES.start();
+    REDIS.start();
   }
 
   @DynamicPropertySource
@@ -61,6 +72,8 @@ public abstract class IntegrationTestSupport {
     registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
     registry.add("spring.datasource.username", POSTGRES::getUsername);
     registry.add("spring.datasource.password", POSTGRES::getPassword);
+    registry.add("spring.data.redis.host", REDIS::getHost);
+    registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
   }
 
   /**

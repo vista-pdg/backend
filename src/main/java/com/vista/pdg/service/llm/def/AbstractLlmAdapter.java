@@ -29,9 +29,21 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
 
   @Override
   public StructureContract generate(String userPrompt) {
+    return generate(userPrompt, ConversationContext.empty());
+  }
+
+  /**
+   * El contexto (HU-32) se antepone a la instrucción y forma parte del prompt base, así que los
+   * reintentos por contrato inválido lo conservan: corregir el formato no puede hacer que el modelo
+   * pierda de vista la estructura que estaba refinando.
+   */
+  @Override
+  public StructureContract generate(String userPrompt, ConversationContext context) {
     String systemPrompt = loadSystemPrompt();
     List<AttemptDetail> failures = new ArrayList<>();
-    String prompt = userPrompt;
+    String base =
+        (context == null ? ConversationContext.empty() : context).asPromptBlock() + userPrompt;
+    String prompt = base;
 
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -48,7 +60,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
         if (attempt < MAX_ATTEMPTS) {
           sleepBackoff(attempt);
           prompt =
-              userPrompt
+              base
                   + "\n\nYour previous response failed with: "
                   + e.getMessage()
                   + ". Please correct it and respond with valid JSON only.";
@@ -59,7 +71,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
         if (attempt < MAX_ATTEMPTS) {
           sleepBackoff(attempt);
           prompt =
-              userPrompt
+              base
                   + "\n\nYour previous response failed with: "
                   + msg
                   + ". Please correct it and respond with valid JSON only.";
