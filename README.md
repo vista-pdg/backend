@@ -20,7 +20,7 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 |---|---|---|
 | `dev` (defecto) | desarrollo local | logs en DEBUG |
 | `prod` | despliegue | logs en INFO/WARN |
-| `e2e` | Cypress y CI | `/api/generate` responde un grafo fijo (`StubLlmAdapter`): sin clave de Gemini, sin red, sin consumo facturable. La cuota diaria y el límite de tasa **sí** aplican (los prueba Cypress). Arrancar con él deja una advertencia en el log. |
+| `e2e` | Cypress y CI | `/api/generate` responde estructuras fijas (`StubLlmAdapter`: K3, C_n, pila, cola) **sin llamar a Gemini**: cualquier instrucción de árbol devuelve el K3 de 3 nodos. La cuota diaria y el límite de tasa sí aplican. Arrancar con él deja una advertencia en el log; para usar la app de verdad, arranca con `dev`. |
 
 `SPRING_PROFILES_ACTIVE=e2e make run`
 
@@ -65,6 +65,28 @@ familia. Cada rotación consume su eslabón; presentar uno ya rotado revoca la f
 `TELEMETRY_PSEUDONYM_SECRET`, truncado a 64 bits), el código de curso, el periodo, el tipo de
 estructura y la fecha. **Sin clave foránea al usuario, sin correo, sin nombre.** HMAC y no un hash
 simple porque los ids son pequeños y secuenciales: con SHA-256 a secas bastaría probar 1, 2, 3…
+
+### Generación por el asistente: de texto libre a contrato fijo
+
+El modelo no es determinista, así que la cadena que lo rodea sí lo es:
+
+1. `GeminiLlmAdapter` pide **salida JSON** (`responseMimeType`) con **temperatura 0** y un prompt
+   con los seis esquemas (`prompts/graph/system-prompt.txt`).
+2. `ContractNormalizer` traduce las formas laxas habituales (alias de tipo en dos idiomas, `values`
+   sin `operations`, aristas en vez de matriz, números como texto…) al contrato estricto.
+3. `ContractValidator` rechaza lo que no se pueda normalizar y el adaptador reintenta (máx. 3) con el
+   error como corrección.
+4. Los fallos del proveedor —créditos/cuota (429), clave (401/403), modelo (404), caída (503)— no se
+   reintentan: `LlmUnavailableException` → HTTP 503 con el motivo en el mensaje.
+5. `LayoutDispatcher` garantiza una posición por nodo (bosques, aristas rotas, pistas de layout
+   desconocidas): nada se dibuja encima del origen.
+
+`GenerationPipelineTest` recorre esa cadena por tipo de estructura sin modelo. Para probar el modelo de
+verdad (consume créditos, no corre en CI):
+
+```bash
+GEMINI_LIVE_TESTS=true ./mvnw -Dtest=GeminiLiveGenerationTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
 
 ### Cuota del asistente (HU-17)
 

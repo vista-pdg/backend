@@ -2,6 +2,7 @@ package com.vista.pdg.service.llm.def;
 
 import com.vista.pdg.exception.InvalidContractException;
 import com.vista.pdg.exception.LlmExhaustedException;
+import com.vista.pdg.exception.LlmUnavailableException;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.model.response.StructureResponse.AttemptDetail;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
@@ -39,6 +40,9 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
         log.debug("LLM attempt {} raw response: {}", attempt, raw);
         return contractBuilder.build(json);
 
+      } catch (LlmUnavailableException e) {
+        // Créditos, cuota o clave: el mismo prompt no va a funcionar en un segundo intento.
+        throw e;
       } catch (InvalidContractException e) {
         failures.add(new AttemptDetail(attempt, e.getMessage()));
         if (attempt < MAX_ATTEMPTS) {

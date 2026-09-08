@@ -169,6 +169,11 @@
 								<include>com/vista/pdg/controller/StructureController*</include>
 								<include>com/vista/pdg/controller/AlgorithmController*</include>
 								<include>com/vista/pdg/service/algorithm/**</include>
+								<include>com/vista/pdg/service/sdd/impl/ContractNormalizer*</include>
+								<include>com/vista/pdg/service/sdd/impl/ContractBuilder*</include>
+								<include>com/vista/pdg/service/llm/def/AbstractLlmAdapter*</include>
+								<include>com/vista/pdg/service/layout/impl/LayoutDispatcher*</include>
+								<include>com/vista/pdg/service/layout/impl/graph/TreeLayout3D*</include>
 								<include>com/vista/pdg/service/generator/impl/StackGenerator*</include>
 								<include>com/vista/pdg/service/generator/impl/QueueGenerator*</include>
 								<include>com/vista/pdg/service/layout/impl/StackLayout3D*</include>
