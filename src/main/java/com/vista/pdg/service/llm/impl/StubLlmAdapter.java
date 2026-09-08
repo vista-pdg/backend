@@ -4,7 +4,10 @@ import com.vista.pdg.model.contract.GraphContract;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.service.llm.def.LlmAdapter;
 import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
@@ -32,15 +35,48 @@ public class StubLlmAdapter implements LlmAdapter {
     log.warn("Perfil e2e activo: /api/generate responde con un grafo fijo, NO llama a Gemini");
   }
 
+  /** «grafo de 12 nodos», «ciclo con 8 vértices»: el número manda; sin número, K3. */
+  private static final Pattern SIZE = Pattern.compile("(\\d{1,2})\\s*(v[ée]rtices|nodos)");
+
   @Override
   public StructureContract generate(String userPrompt) {
+    int n = requestedSize(userPrompt);
+    if (n <= 3) {
+      return new GraphContract(
+          "graph",
+          null,
+          false,
+          false,
+          List.of("A", "B", "C"),
+          new GraphContract.MatrixDef(
+              "adjacency", List.of(List.of(0, 1, 1), List.of(1, 0, 1), List.of(1, 1, 0)), null));
+    }
+    // Un ciclo C_n: n nodos, n aristas, determinista. Suficiente para las pruebas que necesitan
+    // "un grafo con 12 nodos" (HU-18 · CA-3) sin depender del modelo.
+    List<String> labels = new ArrayList<>();
+    List<List<Integer>> matrix = new ArrayList<>();
+    for (int i = 0; i < n; i++) {
+      labels.add("V" + (i + 1));
+      List<Integer> row = new ArrayList<>();
+      for (int j = 0; j < n; j++) {
+        boolean adjacent = j == (i + 1) % n || i == (j + 1) % n;
+        row.add(adjacent ? 1 : 0);
+      }
+      matrix.add(row);
+    }
     return new GraphContract(
         "graph",
         null,
         false,
         false,
-        List.of("A", "B", "C"),
-        new GraphContract.MatrixDef(
-            "adjacency", List.of(List.of(0, 1, 1), List.of(1, 0, 1), List.of(1, 1, 0)), null));
+        labels,
+        new GraphContract.MatrixDef("adjacency", matrix, null));
+  }
+
+  private static int requestedSize(String prompt) {
+    if (prompt == null) return 3;
+    Matcher m = SIZE.matcher(prompt.toLowerCase());
+    if (!m.find()) return 3;
+    return Math.min(20, Math.max(3, Integer.parseInt(m.group(1))));
   }
 }
