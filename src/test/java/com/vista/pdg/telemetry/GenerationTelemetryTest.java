@@ -62,7 +62,7 @@ class GenerationTelemetryTest extends IntegrationTestSupport {
     GenerationEvent ev = mine.getLast();
     assertThat(ev.getCourseCode()).isEqualTo("CEDI-G1");
     assertThat(ev.getTermCode()).isEqualTo("2026-1");
-    assertThat(ev.getStructureType()).isEqualTo("graph");
+    assertThat(ev.getStructureType()).as("HU-21: tipo detallado").isEqualTo("grafo_no_dirigido");
     assertThat(ev.getNodeCount()).isEqualTo(3);
     assertThat(ev.getCreatedAt()).isNotNull();
   }

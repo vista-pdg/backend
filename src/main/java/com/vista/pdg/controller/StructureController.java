@@ -6,6 +6,7 @@ import com.vista.pdg.assistant.service.AssistantQuotaService;
 import com.vista.pdg.assistant.session.AssistantSessionService;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.controller.dto.GenerateRequest;
+import com.vista.pdg.exception.LlmUnavailableException;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.model.generated.GeneratedStructure;
 import com.vista.pdg.model.math.Vec3;
@@ -14,6 +15,7 @@ import com.vista.pdg.service.generator.impl.GeneratorDispatcher;
 import com.vista.pdg.service.layout.impl.LayoutDispatcher;
 import com.vista.pdg.service.llm.def.ConversationContext;
 import com.vista.pdg.service.llm.def.LlmAdapter;
+import com.vista.pdg.telemetry.service.InteractionEvent;
 import com.vista.pdg.telemetry.service.TelemetryService;
 import com.vista.pdg.telemetry.service.VisualizationMode;
 import java.util.Map;
@@ -68,11 +70,24 @@ public class StructureController {
     // HU-32: la sesión de trabajo, si la hay, viaja como contexto. Sin ella (o sin Redis) esto es
     // exactamente la generación de siempre.
     ConversationContext context = sessionService.contextFor(user.getId());
-    StructureContract contract = llmAdapter.generate(req.prompt(), context);
-    GeneratedStructure structure = generatorDispatcher.dispatch(contract);
+    // HU-21 · CA-4: todos los eventos de esta petición comparten la sesión de trabajo.
+    String sessionId = sessionService.ensureSessionId(user.getId());
+
+    StructureContract contract;
+    GeneratedStructure structure;
+    try {
+      contract = llmAdapter.generate(req.prompt(), context);
+      structure = generatorDispatcher.dispatch(contract);
+    } catch (RuntimeException e) {
+      // HU-21 · CA-3: lo que el estudiante pidió y no obtuvo también es un dato. Se distingue lo
+      // que la plataforma no cubre (señal pedagógica) de que el proveedor no respondiera.
+      telemetryService.recordFailedGeneration(user, req.prompt(), outcomeOf(e), mode, sessionId);
+      throw e;
+    }
+
     Map<String, Vec3> positions = layoutDispatcher.compute(structure);
     // HU-16 CA-5: el evento se registra seudonimizado y sólo si la generación tuvo éxito.
-    telemetryService.recordGeneration(user, structure, mode);
+    telemetryService.recordGeneration(user, structure, mode, sessionId);
     StructureResponse body = StructureResponse.of(contract, structure, positions);
     boolean remembered = remember(user.getId(), contract, req.prompt(), body);
 
@@ -82,6 +97,16 @@ public class StructureController {
         .header("X-Quota-Reset", quota.resetsAt().toString())
         .header(MEMORY_HEADER, remembered ? "active" : "unavailable")
         .body(body);
+  }
+
+  /**
+   * Un fallo del proveedor es un problema de operación; todo lo demás —contrato inválido, tipo no
+   * soportado, el modelo agotó los intentos— es que el estudiante pidió algo que no cubrimos.
+   */
+  private static InteractionEvent.Outcome outcomeOf(RuntimeException e) {
+    return e instanceof LlmUnavailableException
+        ? InteractionEvent.Outcome.ERROR
+        : InteractionEvent.Outcome.FUERA_DE_ALCANCE;
   }
 
   /**

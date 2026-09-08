@@ -52,7 +52,7 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 ```
 auth/        registro, login, par de tokens con detección de reuso, roles STUDENT/TEACHER/ADMIN
 academic/    periodos académicos y cursos; GET /api/courses (público)
-telemetry/   eventos de generación seudonimizados; GET /api/analytics/summary (solo TEACHER)
+telemetry/   registro analítico seudonimizado; /api/analytics/** (solo TEACHER) y la escritura del cliente
 security/    JwtAuthFilter, 401 sin autenticación / 403 con rol insuficiente
 assistant/   cuota diaria por estudiante, límite de tasa, cuota por curso (ADMIN) con auditoría
   session/   memoria conversacional en Redis: contrato vigente + últimos turnos, con TTL
@@ -71,6 +71,46 @@ familia. Cada rotación consume su eslabón; presentar uno ya rotado revoca la f
 `TELEMETRY_PSEUDONYM_SECRET`, truncado a 64 bits), el código de curso, el periodo, el tipo de
 estructura y la fecha. **Sin clave foránea al usuario, sin correo, sin nombre.** HMAC y no un hash
 simple porque los ids son pequeños y secuenciales: con SHA-256 a secas bastaría probar 1, 2, 3…
+
+### Registro analítico de interacciones (HU-21)
+
+Cada interacción con una estructura o un algoritmo deja un evento en `generation_events`. El esquema
+está **versionado en la fila**: `schema_version = 2` desde esta historia, y las filas anteriores
+llegan sin valor, que se lee como v1. Con `ddl-auto=update` y sin migraciones, versionar en la fila
+es lo único que permite releer los históricos sin malinterpretarlos.
+
+| Campo | Qué guarda |
+|---|---|
+| `structure_type` | en v2, el tipo **detallado** en español: `grafo_no_dirigido`, `grafo_dirigido`, `arbol_avl`, `arbol_bst`, `heap`, `lista_simple`, `lista_doble`, `lista_circular`, `tabla_hash`, `pila`, `cola`. En v1 era el tipo grueso del contrato (`graph`) |
+| `algorithm` | algoritmo ejecutado, en mayúsculas (`BFS`); nulo en las generaciones |
+| `interaction_source` | `asistente_nlp` (chat) o `catalogo_algoritmos` (panel) |
+| `outcome` | `exito`, `fuera_de_alcance` (el estudiante pidió algo que no cubrimos) o `error` (el proveedor no respondió) |
+| `session_id` | la sesión de trabajo de HU-32, que agrupa los reintentos; nula si Redis no estaba disponible |
+| `step_count` | pasos del rastro; en el evento que reporta el cliente, los que el estudiante recorrió |
+| `prompt_text` | la instrucción, **sólo** cuando el resultado no fue éxito, recortada a 500 caracteres |
+
+Distinguir `fuera_de_alcance` de `error` es lo que hace útil el registro: lo primero es señal
+pedagógica, lo segundo es operación. Y el texto sólo se guarda cuando hizo falta revisarlo: en los
+éxitos sería contenido del estudiante almacenado sin necesidad (R03).
+
+**Puntos de captura.** `/api/generate` registra el éxito y también el fallo (captura, registra y
+relanza); `/api/algorithm/steps` registra la ejecución; y `POST /api/assistant/events` es el único
+punto que escribe el **cliente**, con el payload mínimo `{event, type, subtype, algorithm, stepCount,
+nodeCount}`. Llegar al último paso es un hecho que sólo el navegador conoce. El servidor pone
+seudónimo, curso, sesión y hora: **el cliente no puede escribir identidad ni falsear la cohorte**, y
+la respuesta es siempre 202 para que la telemetría no rompa nada.
+
+**Consulta del docente** (`TEACHER`): `GET /api/analytics/summary` (agregados), `GET
+/api/analytics/events?outcome=&limit=` (los últimos eventos, con el prompt de los que no salieron
+bien y **sin seudónimo**: se revisa qué se pidió, no quién) y `GET
+/api/analytics/retries?minAttempts=3&windowSeconds=120` (secuencias de reintento). Los reintentos no
+se marcan al escribir —cuando ocurre el primer intento nadie sabe aún que habrá un tercero— sino que
+se detectan al consultar agrupando por sesión y tipo de estructura, así el umbral se cambia sin
+migrar datos.
+
+Escribir un evento nunca puede tumbar la petición que lo produjo: `TelemetryService.record` abre una
+transacción propia (`REQUIRES_NEW`) **dentro** del `try`, de modo que un fallo al confirmar también
+queda atrapado y sólo llega al log.
 
 ### Generación por el asistente: de texto libre a contrato fijo
 
