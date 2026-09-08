@@ -37,8 +37,7 @@ public class BucketLayout3D implements LayoutStrategy {
       positions.put(buckets.get(i).id(), Vec3.of(x, 0, 0));
     }
 
-    Map<String, Node3D> nodeById =
-        nodes.stream().collect(Collectors.toMap(Node3D::id, n -> n));
+    Map<String, Node3D> nodeById = nodes.stream().collect(Collectors.toMap(Node3D::id, n -> n));
 
     for (Node3D node : nodes) {
       if (node.parent() == null) continue;

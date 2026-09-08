@@ -1,5 +1,6 @@
 package com.vista.pdg.security;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
   private final JwtAuthFilter jwtAuthFilter;
+  private final RestAuthenticationEntryPoint authenticationEntryPoint;
 
   @Bean
   SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -27,7 +29,20 @@ public class SecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/auth/**")
+                auth
+                    // El contenedor reenvía los errores a /error, y ese reenvío vuelve a pasar por
+                    // la cadena sin autenticación. Sin permitirlo, la respuesta del reenvío pisa a
+                    // la original: un 403 por rol insuficiente salía como 401. MockMvc no ejecuta
+                    // ese despacho, así que sólo se ve contra un servidor real.
+                    .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD)
+                    .permitAll()
+                    // El propio token de refresco autentica estas llamadas, así que no exigen
+                    // un token de acceso: en /refresh y /logout lo normal es que ya haya expirado.
+                    .requestMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/refresh",
+                        "/api/auth/logout")
                     .permitAll()
                     .requestMatchers("/api/generate", "/api/algorithm/steps")
                     .permitAll()
@@ -35,6 +50,9 @@ public class SecurityConfig {
                     .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
+        // 401 cuando no hay autenticación, 403 cuando la hay pero el rol no alcanza. El cliente
+        // necesita distinguirlas: la primera la resuelve refrescando el token, la segunda no.
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

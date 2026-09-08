@@ -1,3 +1,5 @@
+name: vista
+
 services:
   postgres:
     image: postgres:17

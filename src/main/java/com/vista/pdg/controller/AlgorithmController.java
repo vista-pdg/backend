@@ -18,7 +18,9 @@ public class AlgorithmController {
 
   @PostMapping("/steps")
   public ResponseEntity<StepsResponse> steps(@RequestBody AlgorithmRequest req) {
-    if ("tree".equals(req.type()) && "avl".equals(req.subtype()) && "insert".equals(req.operation())) {
+    if ("tree".equals(req.type())
+        && "avl".equals(req.subtype())
+        && "insert".equals(req.operation())) {
       return ResponseEntity.ok(avlStepsService.generateAvlInsertSteps(req.values()));
     }
     return ResponseEntity.ok(

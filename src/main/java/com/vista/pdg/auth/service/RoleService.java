@@ -44,8 +44,6 @@ public class RoleService {
 
   private RoleDto toDto(Role r) {
     return new RoleDto(
-        r.getId(),
-        r.getName(),
-        r.getPermissions().stream().map(Permission::getName).toList());
+        r.getId(), r.getName(), r.getPermissions().stream().map(Permission::getName).toList());
   }
 }
