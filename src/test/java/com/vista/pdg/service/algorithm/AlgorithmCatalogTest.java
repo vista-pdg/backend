@@ -26,11 +26,12 @@ class AlgorithmCatalogTest extends IntegrationTestSupport {
     mockMvc
         .perform(get("/api/algorithm/catalog").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(4))
+        .andExpect(jsonPath("$.length()").value(5))
         .andExpect(jsonPath("$[?(@.family=='graph')].operation").value("bfs"))
         .andExpect(jsonPath("$[?(@.family=='stack')].operation").value("pop"))
         .andExpect(jsonPath("$[?(@.family=='queue')].operation").value("dequeue"))
-        .andExpect(jsonPath("$[?(@.family=='tree')].operation").value("insert"))
+        .andExpect(jsonPath("$[?(@.operation=='insert')].family").value("tree"))
+        .andExpect(jsonPath("$[?(@.operation=='inorder')].family").value("tree"))
         .andExpect(jsonPath("$[?(@.operation=='bfs')].input").value("structure"))
         .andExpect(jsonPath("$[*].label").isArray());
   }
