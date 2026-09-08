@@ -11,17 +11,27 @@ import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.generator.impl.StackGenerator;
 import com.vista.pdg.service.layout.impl.StackLayout3D;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /**
- * {@code pop} hasta vaciar la pila (HU-19 · CA-5). Dos pasos por retiro: primero el tope queda
- * resaltado ({@code pop}) y en el siguiente ya no está. Así el rastro distingue el estado anterior
- * del posterior sin depender de la animación.
+ * {@code pop} hasta vaciar la pila (HU-19 · CA-5), instrumentado (HU-22b). Dos pasos por retiro:
+ * primero el tope queda resaltado ({@code pop}, línea 3) y en el siguiente ya no está (línea 4).
+ * Las variables son {@code tope}, {@code tamaño} y {@code retirados}.
  */
 @Service
 public class StackPopAlgorithm implements AlgorithmStrategy {
+
+  public static final List<String> CODE =
+      List.of(
+          "vaciar(pila):",
+          "  mientras pila no esté vacía:",
+          "    tope ← pila.cima()",
+          "    pila.retirar()   // pop",
+          "    retirados.añadir(tope)",
+          "  retornar retirados");
 
   private static final AlgorithmDescriptor DESCRIPTOR =
       new AlgorithmDescriptor(
@@ -50,6 +60,7 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
       return StepsResponse.error("Se requiere al menos un valor en la pila");
     }
     List<Integer> stack = new ArrayList<>(req.values());
+    List<Integer> removed = new ArrayList<>();
     List<AlgorithmStep> steps = new ArrayList<>();
     steps.add(
         step(
@@ -58,7 +69,9 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
             "Estado inicial. Tope: " + stack.getLast() + ", base: " + stack.getFirst() + ".",
             "initial",
             List.of(),
-            stack));
+            stack,
+            1,
+            vars("—", stack.size(), removed)));
     while (!stack.isEmpty()) {
       int top = stack.getLast();
       String topId = "n" + (stack.size() - 1);
@@ -69,8 +82,11 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
               "El tope es " + top + ". Es el único elemento accesible: se retira a continuación.",
               "pop",
               List.of(topId),
-              stack));
+              stack,
+              3,
+              vars(String.valueOf(top), stack.size(), removed)));
       stack.removeLast();
+      removed.add(top);
       steps.add(
           step(
               steps.size(),
@@ -80,9 +96,19 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
                   : "Quedan " + stack.size() + " elementos. Nuevo tope: " + stack.getLast() + ".",
               "done",
               stack.isEmpty() ? List.of() : List.of("n" + (stack.size() - 1)),
-              stack));
+              stack,
+              4,
+              vars(String.valueOf(top), stack.size(), removed)));
     }
-    return StepsResponse.ok(steps);
+    return StepsResponse.ok(steps, CODE, "pseudocode");
+  }
+
+  private static Map<String, String> vars(String top, int size, List<Integer> removed) {
+    Map<String, String> m = new LinkedHashMap<>();
+    m.put("tope", top);
+    m.put("tamaño", String.valueOf(size));
+    m.put("retirados", removed.toString());
+    return m;
   }
 
   private AlgorithmStep step(
@@ -91,7 +117,9 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
       String description,
       String type,
       List<String> hl,
-      List<Integer> values) {
+      List<Integer> values,
+      int line,
+      Map<String, String> variables) {
     List<Node3D> nodes = StackGenerator.stackNodes(values);
     Map<String, Vec3> pos =
         layout.compute(new GeneratedStructure(null, nodes, List.of(), Map.of()));
@@ -103,6 +131,7 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
                   return n.withPosition(p.x(), p.y(), p.z());
                 })
             .toList();
-    return new AlgorithmStep(index, title, description, type, hl, null, placed, List.of());
+    return new AlgorithmStep(
+        index, title, description, type, hl, null, placed, List.of(), line, variables, null);
   }
 }

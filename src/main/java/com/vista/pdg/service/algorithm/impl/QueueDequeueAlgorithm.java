@@ -12,17 +12,27 @@ import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.generator.impl.QueueGenerator;
 import com.vista.pdg.service.layout.impl.LinearLayout3D;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /**
- * {@code dequeue} hasta vaciar la cola (HU-19). Dos pasos por retiro, como {@code pop}: el frente
- * resaltado y luego la cola sin él. Los ids se reasignan desde el frente en cada instantánea
- * ({@code n0} es siempre el frente), igual que hace el generador.
+ * {@code dequeue} hasta vaciar la cola (HU-19), instrumentado (HU-22b). Dos pasos por retiro, como
+ * {@code pop}: el frente resaltado (línea 3) y luego la cola sin él (línea 4). Los ids se reasignan
+ * desde el frente en cada instantánea ({@code n0} es siempre el frente), igual que el generador.
  */
 @Service
 public class QueueDequeueAlgorithm implements AlgorithmStrategy {
+
+  public static final List<String> CODE =
+      List.of(
+          "vaciar(cola):",
+          "  mientras cola no esté vacía:",
+          "    frente ← cola.primero()",
+          "    cola.retirar()   // dequeue",
+          "    atendidos.añadir(frente)",
+          "  retornar atendidos");
 
   private static final AlgorithmDescriptor DESCRIPTOR =
       new AlgorithmDescriptor(
@@ -51,6 +61,7 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
       return StepsResponse.error("Se requiere al menos un valor en la cola");
     }
     List<Integer> queue = new ArrayList<>(req.values());
+    List<Integer> served = new ArrayList<>();
     List<AlgorithmStep> steps = new ArrayList<>();
     steps.add(
         step(
@@ -59,7 +70,9 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
             "Estado inicial. Frente: " + queue.getFirst() + ", final: " + queue.getLast() + ".",
             "initial",
             List.of(),
-            queue));
+            queue,
+            1,
+            vars("—", queue.size(), served)));
     while (!queue.isEmpty()) {
       int front = queue.getFirst();
       steps.add(
@@ -69,8 +82,11 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
               "El frente es " + front + ". Sale el primero que entró.",
               "dequeue",
               List.of("n0"),
-              queue));
+              queue,
+              3,
+              vars(String.valueOf(front), queue.size(), served)));
       queue.removeFirst();
+      served.add(front);
       steps.add(
           step(
               steps.size(),
@@ -84,9 +100,19 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
                       + ".",
               "done",
               queue.isEmpty() ? List.of() : List.of("n0"),
-              queue));
+              queue,
+              4,
+              vars(String.valueOf(front), queue.size(), served)));
     }
-    return StepsResponse.ok(steps);
+    return StepsResponse.ok(steps, CODE, "pseudocode");
+  }
+
+  private static Map<String, String> vars(String front, int size, List<Integer> served) {
+    Map<String, String> m = new LinkedHashMap<>();
+    m.put("frente", front);
+    m.put("tamaño", String.valueOf(size));
+    m.put("atendidos", served.toString());
+    return m;
   }
 
   private AlgorithmStep step(
@@ -95,7 +121,9 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
       String description,
       String type,
       List<String> hl,
-      List<Integer> values) {
+      List<Integer> values,
+      int line,
+      Map<String, String> variables) {
     List<Node3D> nodes = QueueGenerator.queueNodes(values);
     List<Edge3D> edges = QueueGenerator.queueEdges(values.size());
     Map<String, Vec3> pos = layout.compute(new GeneratedStructure(null, nodes, edges, Map.of()));
@@ -107,6 +135,7 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
                   return n.withPosition(p.x(), p.y(), p.z());
                 })
             .toList();
-    return new AlgorithmStep(index, title, description, type, hl, null, placed, edges);
+    return new AlgorithmStep(
+        index, title, description, type, hl, null, placed, edges, line, variables, null);
   }
 }

@@ -6,11 +6,14 @@ import com.vista.pdg.model.generated.GeneratedStructure;
 import com.vista.pdg.model.generated.Node3D;
 import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.model.response.AlgorithmStep;
+import com.vista.pdg.model.response.AlgorithmStep.Frame;
 import com.vista.pdg.model.response.StepsResponse;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.layout.impl.graph.TreeLayout3D;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,13 +21,13 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /**
- * Recorrido inorden recursivo instrumentado (HU-22a).
+ * Recorrido inorden recursivo instrumentado (HU-22a, HU-22b).
  *
  * <p>Recorre el árbol que hay en el lienzo (nodos con {@code parent}) o, si la petición no trae
  * estructura, construye un BST con {@code values}. Emite <b>un paso por línea ejecutada</b> del
- * pseudocódigo: cada {@link AlgorithmStep} lleva {@code line} y el nodo sobre el que se ejecuta, de
- * modo que el panel de código y los adaptadores 2D/3D consumen el mismo rastro. El estado por nodo
- * va en {@code properties.state} ({@code current}, {@code visited}) como en BFS.
+ * pseudocódigo: cada {@link AlgorithmStep} lleva {@code line}, las variables vigentes ({@code
+ * nodo}, {@code salida}) y la pila de llamadas (un marco {@code inorden(nodo)} por llamada activa),
+ * además del nodo sobre el que se ejecuta. El estado por nodo va en {@code properties.state}.
  */
 @Service
 public class InorderTraversalAlgorithm implements AlgorithmStrategy {
@@ -70,13 +73,14 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
       return StepsResponse.error("Inorden necesita un árbol en el lienzo o una lista de valores");
     }
     Tracer t = new Tracer(tree);
+    t.push(tree.root);
     t.step(
         1,
         tree.root,
         "frontier",
         "inorden(" + tree.label(tree.root) + ")",
         "Llamada inicial con la raíz.");
-    t.inorder(tree.root, 1);
+    t.inorder(tree.root);
     t.done();
     return StepsResponse.ok(t.steps, CODE, "pseudocode");
   }
@@ -98,6 +102,7 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
     }
 
     String label(String id) {
+      if (id == null) return "nulo";
       Node3D n = byId.get(id);
       return n == null ? id : n.label();
     }
@@ -209,6 +214,9 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
     final Map<String, String> state = new HashMap<>();
     final Map<String, Vec3> positions;
 
+    /** Marcos activos, la base primero; el paso copia la lista tal cual. */
+    final Deque<Frame> frames = new ArrayDeque<>();
+
     Tracer(Tree tree) {
       this.tree = tree;
       boolean positioned =
@@ -219,46 +227,54 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
               : layout.compute(new GeneratedStructure(null, tree.nodes, tree.edges, Map.of()));
     }
 
-    void inorder(String node, int depth) {
+    void push(String node) {
+      frames.addLast(new Frame("inorden", Map.of("nodo", tree.label(node))));
+    }
+
+    void pop() {
+      frames.pollLast();
+    }
+
+    void inorder(String node) {
+      String name = tree.label(node);
       step(
           2,
           node,
           "frontier",
-          "¿" + (node == null ? "nulo" : tree.label(node)) + " es nulo?",
+          "¿" + name + " es nulo?",
           node == null
               ? "Sí: no hay nada que recorrer."
               : "No: se sigue con el subárbol izquierdo.");
       if (node == null) {
         step(3, null, "frontier", "retornar", "Se vuelve al llamador.");
+        pop();
         return;
       }
       state.put(node, "current");
       String l = tree.left.get(node);
+      push(l);
       step(
           4,
           node,
           "frontier",
-          "inorden(" + (l == null ? "nulo" : tree.label(l)) + ")",
-          "Llamada recursiva con el hijo izquierdo de " + tree.label(node) + ".");
-      inorder(l, depth + 1);
+          "inorden(" + tree.label(l) + ")",
+          "Llamada recursiva con el hijo izquierdo de " + name + ".");
+      inorder(l);
       state.put(node, "current");
-      output.add(tree.label(node));
-      step(
-          5,
-          node,
-          "visit",
-          "visitar(" + tree.label(node) + ")",
-          "Se emite " + tree.label(node) + ". Salida: " + output);
+      output.add(name);
+      step(5, node, "visit", "visitar(" + name + ")", "Se emite " + name + ". Salida: " + output);
       state.put(node, "visited");
       String r = tree.right.get(node);
+      push(r);
       step(
           6,
           node,
           "frontier",
-          "inorden(" + (r == null ? "nulo" : tree.label(r)) + ")",
-          "Llamada recursiva con el hijo derecho de " + tree.label(node) + ".");
-      inorder(r, depth + 1);
-      step(7, node, "done", "retornar", "Termina inorden(" + tree.label(node) + ").");
+          "inorden(" + tree.label(r) + ")",
+          "Llamada recursiva con el hijo derecho de " + name + ".");
+      inorder(r);
+      step(7, node, "done", "retornar", "Termina inorden(" + name + ").");
+      pop();
     }
 
     void done() {
@@ -273,7 +289,9 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
               null,
               last.nodes(),
               last.edges(),
-              null));
+              null,
+              Map.of("salida", output.toString()),
+              List.of()));
     }
 
     void step(int line, String node, String type, String title, String description) {
@@ -297,6 +315,12 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
                         props);
                   })
               .toList();
+      // El nodo de la variable es el parámetro del marco activo: nulo en las llamadas a hijos
+      // ausentes.
+      Frame top = frames.peekLast();
+      Map<String, String> vars = new LinkedHashMap<>();
+      vars.put("nodo", top == null ? tree.label(node) : top.params().get("nodo"));
+      vars.put("salida", output.toString());
       steps.add(
           new AlgorithmStep(
               steps.size(),
@@ -307,7 +331,9 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
               null,
               snapshot,
               tree.edges,
-              line));
+              line,
+              vars,
+              List.copyOf(frames)));
     }
   }
 }

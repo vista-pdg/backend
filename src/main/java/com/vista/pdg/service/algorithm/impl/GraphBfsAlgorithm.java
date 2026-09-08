@@ -19,16 +19,28 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /**
- * Recorrido en anchura sobre la estructura del lienzo (HU-19).
+ * Recorrido en anchura sobre la estructura del lienzo (HU-19), instrumentado (HU-22b).
  *
  * <p>El rastro es determinista: los vecinos se descubren en el orden de las aristas de la petición
  * y la cola es FIFO. Cada paso lleva la instantánea completa con {@code properties.state} por nodo
- * ({@code unvisited} / {@code frontier} / {@code current} / {@code visited}) además del resaltado,
- * para que ambos renderizadores pinten el mismo cuadro. Las posiciones de los nodos son las que
- * llegaron: el algoritmo no mueve nada.
+ * ({@code unvisited} / {@code frontier} / {@code current} / {@code visited}), el resaltado, la
+ * línea del pseudocódigo y las variables ({@code u}, {@code cola}, {@code visitados}, {@code
+ * orden}). La forma del rastro (número y orden de pasos) es la de HU-19: sólo se añadió
+ * instrumentación.
  */
 @Service
 public class GraphBfsAlgorithm implements AlgorithmStrategy {
+
+  public static final List<String> CODE =
+      List.of(
+          "bfs(inicio):",
+          "  cola ← [inicio]; visitados ← {inicio}",
+          "  mientras cola no esté vacía:",
+          "    u ← desencolar(cola)",
+          "    visitar(u)",
+          "    para cada v vecino de u:",
+          "      si v ∉ visitados: marcar v y encolar v",
+          "  retornar orden");
 
   private static final AlgorithmDescriptor DESCRIPTOR =
       new AlgorithmDescriptor(
@@ -66,6 +78,21 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
     List<String> order = new ArrayList<>();
     Deque<String> queue = new ArrayDeque<>();
     Set<String> discovered = new LinkedHashSet<>();
+    String[] current = {null};
+
+    java.util.function.Function<Void, Map<String, String>> vars =
+        v -> {
+          Map<String, String> m = new LinkedHashMap<>();
+          m.put("u", current[0] == null ? "—" : label(byId, current[0]));
+          m.put("cola", labels(byId, new ArrayList<>(queue)));
+          m.put(
+              "visitados",
+              "{"
+                  + String.join(", ", discovered.stream().map(id -> label(byId, id)).toList())
+                  + "}");
+          m.put("orden", labels(byId, order));
+          return m;
+        };
 
     queue.add(start);
     discovered.add(start);
@@ -83,38 +110,55 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
             List.of(start),
             nodes,
             edges,
-            state));
+            state,
+            2,
+            vars.apply(null)));
 
     while (!queue.isEmpty()) {
-      String current = queue.poll();
-      state.put(current, "current");
-      order.add(current);
+      String cur = queue.poll();
+      current[0] = cur;
+      state.put(cur, "current");
+      order.add(cur);
       List<String> newly = new ArrayList<>();
-      for (String nb : adjacency.getOrDefault(current, List.of())) {
+      for (String nb : adjacency.getOrDefault(cur, List.of())) {
         if (discovered.add(nb)) {
           newly.add(nb);
           queue.add(nb);
         }
       }
+      // Instantánea de variables ANTES de encolar los vecinos, que es lo que la línea 4-5 ve.
+      Map<String, String> atVisit = new LinkedHashMap<>();
+      atVisit.put("u", label(byId, cur));
+      List<String> queueBefore = new ArrayList<>(queue);
+      queueBefore.removeAll(newly);
+      atVisit.put("cola", labels(byId, queueBefore));
+      Set<String> discBefore = new LinkedHashSet<>(discovered);
+      discBefore.removeAll(newly);
+      atVisit.put(
+          "visitados",
+          "{" + String.join(", ", discBefore.stream().map(id -> label(byId, id)).toList()) + "}");
+      atVisit.put("orden", labels(byId, order));
       steps.add(
           step(
               steps.size(),
-              "Visitar " + label(byId, current),
+              "Visitar " + label(byId, cur),
               "Se desencola "
-                  + label(byId, current)
+                  + label(byId, cur)
                   + " y se visita. Orden hasta ahora: "
                   + labels(byId, order),
               "visit",
-              List.of(current),
+              List.of(cur),
               nodes,
               edges,
-              state));
+              state,
+              5,
+              atVisit));
       if (!newly.isEmpty()) {
         for (String nb : newly) state.put(nb, "frontier");
         steps.add(
             step(
                 steps.size(),
-                "Descubrir vecinos de " + label(byId, current),
+                "Descubrir vecinos de " + label(byId, cur),
                 "Se encolan "
                     + labels(byId, newly)
                     + ". Cola: "
@@ -123,11 +167,14 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
                 newly,
                 nodes,
                 edges,
-                state));
+                state,
+                7,
+                vars.apply(null)));
       }
-      state.put(current, "visited");
+      state.put(cur, "visited");
     }
 
+    current[0] = null;
     List<String> unreached =
         nodes.stream().map(Node3D::id).filter(id -> !discovered.contains(id)).toList();
     String tail =
@@ -143,8 +190,10 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
             order,
             nodes,
             edges,
-            state));
-    return StepsResponse.ok(steps);
+            state,
+            8,
+            vars.apply(null)));
+    return StepsResponse.ok(steps, CODE, "pseudocode");
   }
 
   private static Map<String, List<String>> adjacency(List<Node3D> nodes, List<Edge3D> edges) {
@@ -166,7 +215,9 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
       List<String> highlighted,
       List<Node3D> nodes,
       List<Edge3D> edges,
-      Map<String, String> state) {
+      Map<String, String> state,
+      int line,
+      Map<String, String> variables) {
     List<Node3D> snapshot =
         nodes.stream()
             .map(
@@ -179,7 +230,17 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
                 })
             .toList();
     return new AlgorithmStep(
-        index, title, description, highlightType, List.copyOf(highlighted), null, snapshot, edges);
+        index,
+        title,
+        description,
+        highlightType,
+        List.copyOf(highlighted),
+        null,
+        snapshot,
+        edges,
+        line,
+        variables,
+        null);
   }
 
   private static String label(Map<String, Node3D> byId, String id) {
