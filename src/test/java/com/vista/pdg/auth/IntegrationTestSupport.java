@@ -38,6 +38,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
       "gemini.api.key=test-key-no-usada",
       "auth.allowed-email-domains=u.icesi.edu.co,icesi.edu.co",
       "auth.min-password-length=8",
+      // El limitador de tasa se prueba aparte con su propio reloj. Aquí se sube para que las suites
+      // que generan varias veces seguidas con la misma cuenta (telemetría) no choquen con él.
+      "assistant.rate.per-minute=1000",
       "spring.jpa.hibernate.ddl-auto=update"
     })
 public abstract class IntegrationTestSupport {

@@ -28,4 +28,12 @@ public class Course {
   @ManyToOne(fetch = FetchType.EAGER, optional = false)
   @JoinColumn(name = "term_id", nullable = false)
   private AcademicTerm term;
+
+  /**
+   * Cuota diaria de mensajes al asistente para los estudiantes del curso (HU-17). Nula = rige la
+   * cuota por defecto de la aplicación. Se resuelve en cada petición, así que un cambio aplica de
+   * inmediato.
+   */
+  @Column(name = "daily_quota")
+  private Integer dailyQuota;
 }
