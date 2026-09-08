@@ -104,6 +104,11 @@
 			<artifactId>spring-boot-starter-tomcat</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<!-- HU-32: sesión de trabajo del asistente (memoria corta con TTL) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-test</artifactId>
@@ -174,6 +179,8 @@
 								<include>com/vista/pdg/service/llm/def/AbstractLlmAdapter*</include>
 								<include>com/vista/pdg/service/layout/impl/LayoutDispatcher*</include>
 								<include>com/vista/pdg/service/layout/impl/graph/TreeLayout3D*</include>
+								<include>com/vista/pdg/service/llm/def/ConversationContext*</include>
+								<include>com/vista/pdg/service/llm/impl/StubLlmAdapter*</include>
 								<include>com/vista/pdg/service/generator/impl/StackGenerator*</include>
 								<include>com/vista/pdg/service/generator/impl/QueueGenerator*</include>
 								<include>com/vista/pdg/service/layout/impl/StackLayout3D*</include>

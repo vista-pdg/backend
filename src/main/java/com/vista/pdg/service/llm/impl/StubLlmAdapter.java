@@ -1,9 +1,13 @@
 package com.vista.pdg.service.llm.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.model.contract.GraphContract;
 import com.vista.pdg.model.contract.QueueContract;
 import com.vista.pdg.model.contract.StackContract;
+import com.vista.pdg.model.contract.TreeContract;
 import com.vista.pdg.model.contract.def.StructureContract;
+import com.vista.pdg.service.llm.def.ConversationContext;
 import com.vista.pdg.service.llm.def.LlmAdapter;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -32,6 +36,12 @@ public class StubLlmAdapter implements LlmAdapter {
 
   private static final Logger log = LoggerFactory.getLogger(StubLlmAdapter.class);
 
+  private final ObjectMapper mapper;
+
+  public StubLlmAdapter(ObjectMapper mapper) {
+    this.mapper = mapper;
+  }
+
   @PostConstruct
   void warn() {
     log.warn("Perfil e2e activo: /api/generate responde con un grafo fijo, NO llama a Gemini");
@@ -43,10 +53,113 @@ public class StubLlmAdapter implements LlmAdapter {
   private static final Pattern NUMBERS = Pattern.compile("-?\\d+");
   private static final Pattern STACK = Pattern.compile("\\b(pila|stack)\\b");
   private static final Pattern QUEUE = Pattern.compile("\\b(cola|queue)\\b");
+  private static final Pattern TREE = Pattern.compile("\\b([aá]rbol|tree|bst|avl)\\b");
+
+  /** Refinamientos que el stub sabe aplicar (HU-32). */
+  private static final Pattern INSERT =
+      Pattern.compile("\\b(inserta|insertar|agrega|a[ñn]ade|insert|add)\\b");
+
+  private static final Pattern DIRECTED = Pattern.compile("\\b(dirigido|directed)\\b");
+
+  /**
+   * Refinamiento determinista (HU-32). Con una estructura vigente en la sesión, el stub aplica los
+   * dos cambios que los escenarios necesitan —insertar valores y volver dirigido un grafo— sobre el
+   * contrato anterior; cualquier otra instrucción se interpreta como estructura nueva, igual que
+   * haría el modelo.
+   */
+  @Override
+  public StructureContract generate(String userPrompt, ConversationContext context) {
+    String lower = userPrompt == null ? "" : userPrompt.toLowerCase();
+    if (context == null || context.currentContract() == null || describesNewStructure(lower)) {
+      return generate(userPrompt);
+    }
+    try {
+      JsonNode current = mapper.readTree(context.currentContract());
+      String type = current.path("type").asText("");
+      if (INSERT.matcher(lower).find()) {
+        List<Integer> added = listedValues(lower, List.of());
+        if (!added.isEmpty()) {
+          if (type.equals("tree")) return treeWith(current, added);
+          if (type.equals("stack") || type.equals("queue"))
+            return sequenceWith(current, type, added);
+        }
+      }
+      if (type.equals("graph") && DIRECTED.matcher(lower).find()) {
+        return directedFrom(current);
+      }
+      // No sé refinarlo: devuelvo la estructura vigente sin cambios, que es lo honesto para un
+      // stub.
+      return mapper.treeToValue(current, StructureContract.class);
+    } catch (Exception e) {
+      log.warn(
+          "Stub: no se pudo refinar sobre el contexto ({}), se genera de cero", e.getMessage());
+      return generate(userPrompt);
+    }
+  }
+
+  /** Nombrar otra familia es empezar de cero, aunque haya sesión. */
+  private static boolean describesNewStructure(String lower) {
+    return STACK.matcher(lower).find()
+        || QUEUE.matcher(lower).find()
+        || TREE.matcher(lower).find()
+        || SIZE.matcher(lower).find();
+  }
+
+  private TreeContract treeWith(JsonNode current, List<Integer> added) {
+    List<Integer> values = new ArrayList<>();
+    JsonNode ops = current.path("operations");
+    if (ops.isArray() && !ops.isEmpty()) {
+      for (JsonNode v : ops.get(0).path("values")) values.add(v.asInt());
+    }
+    values.addAll(added);
+    String subtype = current.path("subtype").asText("bst");
+    return new TreeContract(
+        "tree", null, subtype, List.of(new TreeContract.Operation("insert", values)), null);
+  }
+
+  private StructureContract sequenceWith(JsonNode current, String type, List<Integer> added) {
+    List<Integer> values = new ArrayList<>();
+    for (JsonNode v : current.path("values")) values.add(v.asInt());
+    values.addAll(added);
+    return type.equals("stack")
+        ? new StackContract("stack", null, values)
+        : new QueueContract("queue", null, values);
+  }
+
+  /** Mismas etiquetas y mismas aristas, ahora con un solo sentido por par. */
+  private GraphContract directedFrom(JsonNode current) {
+    List<String> labels = new ArrayList<>();
+    for (JsonNode l : current.path("labels")) labels.add(l.asText());
+    List<List<Integer>> data = new ArrayList<>();
+    for (JsonNode row : current.path("matrix").path("data")) {
+      List<Integer> r = new ArrayList<>();
+      for (JsonNode cell : row) r.add(cell.asInt());
+      data.add(r);
+    }
+    for (int i = 0; i < data.size(); i++) {
+      for (int j = 0; j < i; j++) {
+        if (data.get(i).get(j) != 0 && data.get(j).get(i) != 0) data.get(i).set(j, 0);
+      }
+    }
+    return new GraphContract(
+        "graph",
+        null,
+        true,
+        current.path("weighted").asBoolean(false),
+        labels,
+        new GraphContract.MatrixDef("adjacency", data, null));
+  }
 
   @Override
   public StructureContract generate(String userPrompt) {
     String lower = userPrompt == null ? "" : userPrompt.toLowerCase();
+    // HU-32: «árbol con inserción de 1, 2, 3» — el stub también cubre la familia de árboles.
+    if (TREE.matcher(lower).find()) {
+      String subtype = lower.contains("avl") ? "avl" : "bst";
+      List<Integer> values = listedValues(lower, List.of(10, 5, 15));
+      return new TreeContract(
+          "tree", null, subtype, List.of(new TreeContract.Operation("insert", values)), null);
+    }
     // HU-19: «pila con 3, 42, 8, 17» / «cola con 5, 9, 1, 14». Sin números, cuatro por defecto.
     if (STACK.matcher(lower).find()) {
       return new StackContract("stack", null, listedValues(lower, List.of(3, 42, 8, 17)));

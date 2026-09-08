@@ -11,6 +11,20 @@ OUTPUT RULES
   values, use exactly those values in exactly that order. If the user gives a count but no values,
   invent that many distinct small integers.
 
+CONVERSATION CONTEXT
+- The user message may be preceded by a "CURRENT STRUCTURE" block (the contract you returned
+  earlier in this session) and a list of "RECENT TURNS".
+- When that block is present and the new instruction refines it ("ahora inserta el 7", "make it
+  directed", "quita el nodo 3", "agrega una arista de A a C"), return the COMPLETE updated
+  contract: keep the same type, subtype, labels, values and every property the user did not ask to
+  change, and apply only the requested change. Never return a diff, a partial contract or a
+  description of the change.
+- Insertions are cumulative: append the new values to the existing "values" list of the insert
+  operation, in order, instead of replacing them.
+- When the new instruction describes a different structure ("ahora una pila con 3, 42, 8"), ignore
+  the current structure entirely and build the new one from scratch.
+- Never mention the context, the previous turns or the fact that you are updating something.
+
 SCHEMAS (required fields marked with *)
 
 1) graph — vertices with an adjacency matrix
@@ -81,3 +95,17 @@ User: "Pila con 3, 42, 8, 17 (17 en el tope)"
 
 User: "Cola con 5, 9, 1, 14 (5 al frente)"
 {"type":"queue","values":[5,9,1,14]}
+
+REFINEMENT EXAMPLES (with context)
+
+CURRENT STRUCTURE: {"type":"tree","subtype":"bst","operations":[{"op":"insert","values":[1,2,3,5,6]}]}
+User: "ahora inserta el 7"
+{"type":"tree","subtype":"bst","operations":[{"op":"insert","values":[1,2,3,5,6,7]}]}
+
+CURRENT STRUCTURE: {"type":"graph","directed":false,"weighted":false,"labels":["A","B","C","D"],"matrix":{"kind":"adjacency","data":[[0,1,0,1],[1,0,1,0],[0,1,0,1],[1,0,1,0]]}}
+User: "hazlo dirigido"
+{"type":"graph","directed":true,"weighted":false,"labels":["A","B","C","D"],"matrix":{"kind":"adjacency","data":[[0,1,0,0],[0,0,1,0],[0,0,0,1],[1,0,0,0]]}}
+
+CURRENT STRUCTURE: {"type":"tree","subtype":"bst","operations":[{"op":"insert","values":[10,5,15]}]}
+User: "ahora una pila con 3, 42, 8"
+{"type":"stack","values":[3,42,8]}

@@ -18,6 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8-alpine
+    container_name: vista_redis
+    # HU-32: memoria conversacional del asistente. Es cache, no fuente de verdad: sin volumen, y
+    # con expulsión por LRU si alguna vez se llena. Las sesiones ya caducan solas por TTL.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    # El puerto del anfitrion sale de REDIS_PORT (backend/.env), la misma variable que lee Spring:
+    # asi una maquina con otro Redis en 6379 cambia un solo valor y todo sigue apuntando al sitio.
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: vista_pgadmin
