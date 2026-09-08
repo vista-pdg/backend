@@ -1,5 +1,7 @@
 package com.vista.pdg.auth.service;
 
+import com.vista.pdg.academic.entity.Course;
+import com.vista.pdg.academic.service.CourseService;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
 import com.vista.pdg.auth.dto.RegisterRequest;
@@ -38,6 +40,7 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwt;
   private final RefreshTokenService refreshTokenService;
+  private final CourseService courseService;
 
   @Value("${auth.allowed-email-domains:}")
   private String allowedEmailDomains;
@@ -60,6 +63,8 @@ public class AuthService {
     if (userRepository.existsByEmail(email)) {
       throw new EmailAlreadyUsedException("Ya existe una cuenta con ese correo");
     }
+    // HU-16: toda cuenta de estudiante nace vinculada a un curso del periodo activo.
+    Course course = courseService.requireEnrollable(req.courseCode());
 
     Role studentRole =
         roleRepository
@@ -77,6 +82,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(req.password()))
                 // Mutable a propósito: el seeder reasigna roles y no puede toparse con Set.of().
                 .roles(new HashSet<>(Set.of(studentRole)))
+                .course(course)
                 .enabled(true)
                 .build());
 
@@ -131,7 +137,9 @@ public class AuthService {
         jwt.accessTokenTtlSeconds(),
         user.getEmail(),
         user.getDisplayName(),
-        user.getRoles().stream().map(Role::getName).sorted().toList());
+        user.getRoles().stream().map(Role::getName).sorted().toList(),
+        user.getCourse() != null ? user.getCourse().getCode() : null,
+        user.getCourse() != null ? user.getCourse().getTerm().getCode() : null);
   }
 
   /**
@@ -149,8 +157,9 @@ public class AuthService {
 
     boolean allowed = domains.stream().anyMatch(d -> email.endsWith("@" + d));
     if (!allowed) {
+      // Literal fijado por CA-2 de la HU-16: el E2E lo compara palabra por palabra.
       throw new RegistrationValidationException(
-          "email", "Usa tu correo institucional @" + domains.getFirst());
+          "email", "Debes registrarte con tu correo institucional Icesi");
     }
   }
 

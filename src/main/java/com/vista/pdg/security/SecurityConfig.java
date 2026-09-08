@@ -4,6 +4,7 @@ import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -44,10 +45,16 @@ public class SecurityConfig {
                         "/api/auth/refresh",
                         "/api/auth/logout")
                     .permitAll()
-                    .requestMatchers("/api/generate", "/api/algorithm/steps")
+                    // El selector de curso del registro se consulta antes de que exista sesión.
+                    .requestMatchers(HttpMethod.GET, "/api/courses")
                     .permitAll()
+                    // HU-16 CA-4: sólo el docente ve agregados; el estudiante recibe 403.
+                    .requestMatchers("/api/analytics/**")
+                    .hasRole("TEACHER")
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
+                    // HU-16 CA-3: el asistente ya no es anónimo. Cae en
+                    // anyRequest().authenticated().
                     .anyRequest()
                     .authenticated())
         // 401 cuando no hay autenticación, 403 cuando la hay pero el rol no alcanza. El cliente

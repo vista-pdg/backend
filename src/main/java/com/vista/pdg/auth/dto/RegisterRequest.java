@@ -12,4 +12,5 @@ public record RegisterRequest(
         @Email(message = "El correo no tiene un formato válido")
         String email,
     @NotBlank(message = "La contraseña es obligatoria") String password,
-    @NotBlank(message = "Debes confirmar la contraseña") String confirmPassword) {}
+    @NotBlank(message = "Debes confirmar la contraseña") String confirmPassword,
+    @NotBlank(message = "Selecciona el curso al que perteneces") String courseCode) {}

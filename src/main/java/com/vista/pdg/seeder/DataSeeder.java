@@ -1,5 +1,9 @@
 package com.vista.pdg.seeder;
 
+import com.vista.pdg.academic.entity.AcademicTerm;
+import com.vista.pdg.academic.entity.Course;
+import com.vista.pdg.academic.repository.AcademicTermRepository;
+import com.vista.pdg.academic.repository.CourseRepository;
 import com.vista.pdg.auth.entity.Permission;
 import com.vista.pdg.auth.entity.Role;
 import com.vista.pdg.auth.entity.User;
@@ -40,6 +44,8 @@ public class DataSeeder implements ApplicationRunner {
   private final RoleRepository roleRepo;
   private final UserRepository userRepo;
   private final PasswordEncoder passwordEncoder;
+  private final AcademicTermRepository termRepo;
+  private final CourseRepository courseRepo;
 
   private static final List<String[]> PERMISSIONS =
       List.of(
@@ -63,9 +69,45 @@ public class DataSeeder implements ApplicationRunner {
     admin.setPermissions(new HashSet<>(perms));
     roleRepo.save(admin);
 
+    // HU-16: periodo activo y curso de los antecedentes Gherkin.
+    AcademicTerm term = ensureActiveTerm("2026-1");
+    Course cedi = ensureCourse("CEDI-G1", "Computación y Estructuras Discretas I", term);
+
     ensureUser("admin@vista.com", "Administrador", "admin123", admin);
     ensureUser("docente@u.icesi.edu.co", "Docente Demo", "docente123", teacher);
-    ensureUser("estudiante@u.icesi.edu.co", "Estudiante Demo", "estudiante123", student);
+    User demoStudent =
+        ensureUser("estudiante@u.icesi.edu.co", "Estudiante Demo", "estudiante123", student);
+    if (demoStudent.getCourse() == null) {
+      demoStudent.setCourse(cedi);
+      userRepo.save(demoStudent);
+      log.info("Seeder: estudiante demo vinculado a {}", cedi.getCode());
+    }
+  }
+
+  private AcademicTerm ensureActiveTerm(String code) {
+    AcademicTerm term =
+        termRepo
+            .findByCode(code)
+            .orElseGet(
+                () -> {
+                  log.info("Seeder: periodo {} creado", code);
+                  return termRepo.save(AcademicTerm.builder().code(code).active(true).build());
+                });
+    if (!term.isActive()) {
+      term.setActive(true);
+      termRepo.save(term);
+    }
+    return term;
+  }
+
+  private Course ensureCourse(String code, String name, AcademicTerm term) {
+    return courseRepo
+        .findByCode(code)
+        .orElseGet(
+            () -> {
+              log.info("Seeder: curso {} creado en {}", code, term.getCode());
+              return courseRepo.save(Course.builder().code(code).name(name).term(term).build());
+            });
   }
 
   private List<Permission> ensurePermissions() {
@@ -127,16 +169,19 @@ public class DataSeeder implements ApplicationRunner {
     return roleRepo.save(Role.builder().name(name).permissions(new HashSet<>()).build());
   }
 
-  private void ensureUser(String email, String displayName, String rawPassword, Role role) {
-    if (userRepo.existsByEmail(email)) return;
-    userRepo.save(
-        User.builder()
-            .displayName(displayName)
-            .email(email)
-            .password(passwordEncoder.encode(rawPassword))
-            .roles(new HashSet<>(Set.of(role)))
-            .enabled(true)
-            .build());
+  private User ensureUser(String email, String displayName, String rawPassword, Role role) {
+    Optional<User> existing = userRepo.findByEmail(email);
+    if (existing.isPresent()) return existing.get();
+    User created =
+        userRepo.save(
+            User.builder()
+                .displayName(displayName)
+                .email(email)
+                .password(passwordEncoder.encode(rawPassword))
+                .roles(new HashSet<>(Set.of(role)))
+                .enabled(true)
+                .build());
     log.info("Seeder: usuario {} creado con rol {}", email, role.getName());
+    return created;
   }
 }

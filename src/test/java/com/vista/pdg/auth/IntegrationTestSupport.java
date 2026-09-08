@@ -98,7 +98,8 @@ public abstract class IntegrationTestSupport {
                                 "Prueba " + emailPrefix,
                                 uniqueEmail(emailPrefix),
                                 "clave12345",
-                                "clave12345"))))
+                                "clave12345",
+                                "CEDI-G1"))))
             .andReturn()
             .getResponse()
             .getContentAsString();

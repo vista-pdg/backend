@@ -15,4 +15,7 @@ public record AuthResponse(
     long expiresIn,
     String email,
     String displayName,
-    List<String> roles) {}
+    List<String> roles,
+    /** Nulos cuando la cuenta no está vinculada a un curso (docente, administrador). */
+    String courseCode,
+    String termCode) {}
