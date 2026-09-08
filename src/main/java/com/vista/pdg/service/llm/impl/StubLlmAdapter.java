@@ -1,6 +1,8 @@
 package com.vista.pdg.service.llm.impl;
 
 import com.vista.pdg.model.contract.GraphContract;
+import com.vista.pdg.model.contract.QueueContract;
+import com.vista.pdg.model.contract.StackContract;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.service.llm.def.LlmAdapter;
 import jakarta.annotation.PostConstruct;
@@ -38,8 +40,20 @@ public class StubLlmAdapter implements LlmAdapter {
   /** «grafo de 12 nodos», «ciclo con 8 vértices»: el número manda; sin número, K3. */
   private static final Pattern SIZE = Pattern.compile("(\\d{1,2})\\s*(v[ée]rtices|nodos)");
 
+  private static final Pattern NUMBERS = Pattern.compile("-?\\d+");
+  private static final Pattern STACK = Pattern.compile("\\b(pila|stack)\\b");
+  private static final Pattern QUEUE = Pattern.compile("\\b(cola|queue)\\b");
+
   @Override
   public StructureContract generate(String userPrompt) {
+    String lower = userPrompt == null ? "" : userPrompt.toLowerCase();
+    // HU-19: «pila con 3, 42, 8, 17» / «cola con 5, 9, 1, 14». Sin números, cuatro por defecto.
+    if (STACK.matcher(lower).find()) {
+      return new StackContract("stack", null, listedValues(lower, List.of(3, 42, 8, 17)));
+    }
+    if (QUEUE.matcher(lower).find()) {
+      return new QueueContract("queue", null, listedValues(lower, List.of(5, 9, 1, 14)));
+    }
     int n = requestedSize(userPrompt);
     if (n <= 3) {
       return new GraphContract(
@@ -71,6 +85,13 @@ public class StubLlmAdapter implements LlmAdapter {
         false,
         labels,
         new GraphContract.MatrixDef("adjacency", matrix, null));
+  }
+
+  private static List<Integer> listedValues(String prompt, List<Integer> fallback) {
+    List<Integer> values = new ArrayList<>();
+    Matcher m = NUMBERS.matcher(prompt);
+    while (m.find()) values.add(Integer.parseInt(m.group()));
+    return values.isEmpty() ? fallback : values;
   }
 
   private static int requestedSize(String prompt) {

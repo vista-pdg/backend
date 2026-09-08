@@ -33,6 +33,9 @@ public class LayoutDispatcher {
       case "tree" -> "hierarchical3d";
       case "linked-list" -> resolveLinkedListLayout(structure);
       case "hash-table" -> "bucket3d";
+        // HU-19: la pila crece hacia arriba; la cola es una fila del frente al final.
+      case "stack" -> "stack3d";
+      case "queue" -> "linear3d";
       default -> "force3d";
     };
   }
