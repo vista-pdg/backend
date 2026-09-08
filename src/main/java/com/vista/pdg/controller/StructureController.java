@@ -12,11 +12,13 @@ import com.vista.pdg.service.generator.impl.GeneratorDispatcher;
 import com.vista.pdg.service.layout.impl.LayoutDispatcher;
 import com.vista.pdg.service.llm.def.LlmAdapter;
 import com.vista.pdg.telemetry.service.TelemetryService;
+import com.vista.pdg.telemetry.service.VisualizationMode;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,7 +47,9 @@ public class StructureController {
 
   @PostMapping("/generate")
   public ResponseEntity<StructureResponse> generate(
-      @RequestBody GenerateRequest req, @AuthenticationPrincipal User user) {
+      @RequestBody GenerateRequest req,
+      @RequestHeader(value = VisualizationMode.HEADER, required = false) String mode,
+      @AuthenticationPrincipal User user) {
     // HU-17: la reserva va ANTES del modelo. Un 429 nunca produce una llamada facturable.
     QuotaStatus quota = quotaService.reserve(user);
 
@@ -53,7 +57,7 @@ public class StructureController {
     GeneratedStructure structure = generatorDispatcher.dispatch(contract);
     Map<String, Vec3> positions = layoutDispatcher.compute(structure);
     // HU-16 CA-5: el evento se registra seudonimizado y sólo si la generación tuvo éxito.
-    telemetryService.recordGeneration(user, structure);
+    telemetryService.recordGeneration(user, structure, mode);
 
     return ResponseEntity.ok()
         .header("X-Quota-Limit", String.valueOf(quota.limit()))

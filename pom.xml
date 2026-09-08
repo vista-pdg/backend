@@ -167,6 +167,7 @@
 								<include>com/vista/pdg/auth/dto/RegisterRequest*</include>
 								<include>com/vista/pdg/auth/dto/AuthResponse*</include>
 								<include>com/vista/pdg/controller/StructureController*</include>
+								<include>com/vista/pdg/controller/AlgorithmController*</include>
 							</includes>
 							<rules>
 								<rule>

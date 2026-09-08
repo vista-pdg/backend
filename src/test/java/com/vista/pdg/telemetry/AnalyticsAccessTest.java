@@ -94,7 +94,9 @@ class AnalyticsAccessTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.totalGenerations").isNumber())
         .andExpect(jsonPath("$.distinctUsers").isNumber())
         .andExpect(jsonPath("$.generationsByCourse").isMap())
-        .andExpect(jsonPath("$.generationsByStructureType").isMap());
+        .andExpect(jsonPath("$.generationsByStructureType").isMap())
+        .andExpect(jsonPath("$.totalAlgorithmRuns").isNumber())
+        .andExpect(jsonPath("$.eventsByVisualizationMode").isMap());
   }
 
   /** El agregado no puede convertirse en una lista de personas por la puerta de atrás. */
