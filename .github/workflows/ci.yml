@@ -48,10 +48,10 @@ jobs:
           if-no-files-found: ignore
 
   # Un cambio de backend puede romper el frontend sin que ninguna prueba de este repo lo note.
-  # El flujo compartido levanta este backend con el frontend de main y corre Cypress en ambos
-  # navegadores.
+  # El flujo compartido levanta este backend con el frontend de la rama pareja (mismo nombre) si
+  # existe, o con main, y corre Cypress en ambos navegadores.
   e2e:
-    name: E2E con el frontend en main
+    name: E2E (frontend pareja o main)
     needs: verify
     uses: vista-pdg/dev-workflow/.github/workflows/e2e.yml@main
     with:
