@@ -51,6 +51,21 @@ public class GenerationEvent {
   @Column(nullable = false)
   private int nodeCount;
 
+  /**
+   * HU-18: qué produjo el evento. {@code generation} para {@code /api/generate}, {@code algorithm}
+   * para una ejecución paso a paso. Nulo en filas anteriores a la HU-18, que eran todas
+   * generaciones; las consultas lo tratan como tal.
+   */
+  @Column(length = 16)
+  private String kind;
+
+  /**
+   * HU-18 · CA-7: modo de visualización activo en el cliente cuando pidió la operación ({@code 2D}
+   * o {@code 3D}). Nulo si el cliente no lo informó. Es el campo del análisis de impacto de PdG II.
+   */
+  @Column(length = 4)
+  private String visualizationMode;
+
   @Column(nullable = false)
   @Builder.Default
   private Instant createdAt = Instant.now();

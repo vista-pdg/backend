@@ -20,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class TelemetryService {
 
+  public static final String KIND_GENERATION = "generation";
+  public static final String KIND_ALGORITHM = "algorithm";
+
   private final GenerationEventRepository repository;
   private final Pseudonymizer pseudonymizer;
 
@@ -29,31 +32,59 @@ public class TelemetryService {
    * acaba de pedir.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void recordGeneration(User user, GeneratedStructure structure) {
+  public void recordGeneration(User user, GeneratedStructure structure, String visualizationMode) {
     try {
       var contract = structure.contract();
       repository.save(
-          GenerationEvent.builder()
-              .pseudonym(pseudonymizer.pseudonymFor(user.getId()))
-              .courseCode(user.getCourse() != null ? user.getCourse().getCode() : null)
-              .termCode(user.getCourse() != null ? user.getCourse().getTerm().getCode() : null)
+          base(user, visualizationMode)
+              .kind(KIND_GENERATION)
               .structureType(contract.type())
               .subtype(subtypeOf(structure))
               .nodeCount(structure.nodes().size())
-              .createdAt(Instant.now())
               .build());
     } catch (RuntimeException e) {
       log.error("No se pudo registrar el evento de generación: {}", e.getMessage(), e);
     }
   }
 
+  /**
+   * HU-18 · CA-7: una ejecución paso a paso también es un evento, con el modo de visualización en
+   * el que el estudiante la pidió. Misma política de fallo que la generación.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void recordAlgorithm(
+      User user, String type, String subtype, int nodeCount, String visualizationMode) {
+    try {
+      repository.save(
+          base(user, visualizationMode)
+              .kind(KIND_ALGORITHM)
+              .structureType(type)
+              .subtype(subtype)
+              .nodeCount(nodeCount)
+              .build());
+    } catch (RuntimeException e) {
+      log.error("No se pudo registrar el evento de algoritmo: {}", e.getMessage(), e);
+    }
+  }
+
+  private GenerationEvent.GenerationEventBuilder base(User user, String visualizationMode) {
+    return GenerationEvent.builder()
+        .pseudonym(pseudonymizer.pseudonymFor(user.getId()))
+        .courseCode(user.getCourse() != null ? user.getCourse().getCode() : null)
+        .termCode(user.getCourse() != null ? user.getCourse().getTerm().getCode() : null)
+        .visualizationMode(VisualizationMode.normalize(visualizationMode))
+        .createdAt(Instant.now());
+  }
+
   @Transactional(readOnly = true)
   public AnalyticsSummary summary() {
     return new AnalyticsSummary(
-        repository.count(),
+        repository.countGenerations(),
+        repository.countAlgorithmRuns(),
         repository.countDistinctPseudonyms(),
         toMap(repository.countByCourse()),
-        toMap(repository.countByStructureType()));
+        toMap(repository.countByStructureType()),
+        toMap(repository.countByVisualizationMode()));
   }
 
   private static Map<String, Long> toMap(List<Object[]> rows) {
