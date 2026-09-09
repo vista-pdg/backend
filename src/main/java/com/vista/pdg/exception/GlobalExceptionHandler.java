@@ -3,8 +3,11 @@ package com.vista.pdg.exception;
 import com.vista.pdg.model.response.StructureResponse;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
@@ -12,9 +15,12 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import tools.jackson.core.JacksonException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   // ── Autenticación y registro ────────────────────────────────────────────
 
@@ -118,9 +124,68 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest().body(StructureResponse.error(ex.getMessage(), null));
   }
 
+  // ── Peticiones mal formadas ─────────────────────────────────────────────
+
+  /**
+   * El cuerpo no se pudo leer: JSON roto, un campo primitivo ausente o nulo, un número donde iba
+   * texto. Es un error de quien llama, no nuestro, así que 400 y no 500, y con el campo culpable
+   * señalado para que se pueda corregir sin adivinar.
+   *
+   * <p>Se nombra el campo, nunca el tipo Java ni la excepción: al otro lado hay un cliente HTTP, no
+   * alguien depurando nuestro código.
+   */
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
+    String field = offendingField(ex);
+    String message =
+        field == null
+            ? "El cuerpo de la petición no se pudo leer: revisa que sea JSON válido"
+            : "El campo «" + field + "» falta o no tiene un valor válido";
+    log.debug("Cuerpo ilegible en la petición ({}): {}", ex.getCause(), ex.getMessage());
+    return ResponseEntity.badRequest()
+        .body(
+            field == null
+                ? ApiError.of("MALFORMED_REQUEST", message)
+                : ApiError.field("MALFORMED_REQUEST", message, Map.of(field, message)));
+  }
+
+  /**
+   * Ruta del campo que Jackson no pudo leer, en notación {@code nodes[0].x}.
+   *
+   * <p>Se recorre la cadena de causas en vez de mirar sólo la inmediata: quién envuelve a quién
+   * depende del convertidor de mensajes, y una capa de más no debería dejar al cliente sin saber
+   * qué campo corregir.
+   */
+  private static String offendingField(HttpMessageNotReadableException ex) {
+    JacksonException mapping = null;
+    for (Throwable t = ex; t != null && mapping == null; t = t.getCause()) {
+      if (t instanceof JacksonException candidate && !candidate.getPath().isEmpty()) {
+        mapping = candidate;
+      }
+      if (t.getCause() == t) break;
+    }
+    if (mapping == null) return null;
+    StringBuilder path = new StringBuilder();
+    for (JacksonException.Reference ref : mapping.getPath()) {
+      if (ref.getPropertyName() != null) {
+        if (!path.isEmpty()) path.append('.');
+        path.append(ref.getPropertyName());
+      } else if (ref.getIndex() >= 0) {
+        path.append('[').append(ref.getIndex()).append(']');
+      }
+    }
+    return path.isEmpty() ? null : path.toString();
+  }
+
+  /**
+   * Lo que no supimos clasificar. El mensaje de la excepción <b>no</b> viaja al cliente: puede
+   * llevar la consulta SQL completa con nombres de columnas, y eso es un plano de la base de datos
+   * regalado a cualquiera que provoque un fallo. Queda en el log del servidor, que es donde sirve.
+   */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<StructureResponse> handleGeneric(Exception ex) {
+    log.error("Fallo no controlado atendiendo la petición", ex);
     return ResponseEntity.internalServerError()
-        .body(StructureResponse.error("Unexpected error: " + ex.getMessage(), null));
+        .body(StructureResponse.error("Error inesperado en el servidor", null));
   }
 }
