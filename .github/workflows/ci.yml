@@ -59,3 +59,59 @@ jobs:
       frontend-ref: auto
     secrets:
       VISTA_REPO_TOKEN: ${{ secrets.VISTA_REPO_TOKEN }}
+
+  # CD: tras pasar las pruebas, construye la imagen, la sube a Artifact Registry y
+  # actualiza Cloud Run. Auth sin llaves (Workload Identity Federation, vars en el repo).
+  deploy:
+    name: Build y deploy a Cloud Run
+    needs: [verify, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-${{ github.repository }}
+      cancel-in-progress: false
+    env:
+      IMAGE: ${{ vars.GCP_IMAGE_REPOSITORY }}/backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # Solo cambia la imagen; env, secretos y recursos los gestiona terraform-iac.
+      - name: Deploy
+        run: |
+          gcloud run services update "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --container backend \
+            --image "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"

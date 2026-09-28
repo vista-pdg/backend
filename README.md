@@ -210,3 +210,11 @@ pisaba el 403.
 `vista-pdg/dev-workflow/.github/workflows/e2e.yml`, que levanta este backend con el frontend de
 `main` y corre Cypress en Chromium y Firefox. Requiere el secreto de organización
 **`VISTA_REPO_TOKEN`** (PAT de solo lectura sobre `backend` y `frontend`).
+
+## Despliegue
+
+`Dockerfile` multistage (Maven → distroless Java 21, usuario no root). En cada push a `main`, tras
+`verify` y `e2e`, el job `deploy` de `ci.yml` construye la imagen, la sube a Artifact Registry y
+actualiza el contenedor `backend` de Cloud Run (`vista-backend`). Auth sin llaves por Workload
+Identity Federation. La infraestructura, variables y secretos viven en `vista-pdg/terraform-iac`;
+en Cloud Run el backend usa Gemini por Vertex AI con su cuenta de servicio (sin `GEMINI_API_KEY`).

@@ -1,0 +1,13 @@
+.git
+.github
+.mvn
+target
+docs
+.env
+.env.*
+*.md
+Dockerfile
+.dockerignore
+.venv
+.claude
+compose.yaml
