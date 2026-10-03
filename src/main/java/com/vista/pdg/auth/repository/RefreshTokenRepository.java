@@ -38,4 +38,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
   @Modifying
   @Query("delete from RefreshToken r where r.user = :user and r.expiresAt < :now")
   int deleteExpiredTokens(@Param("user") User user, @Param("now") Instant now);
+
+  /** Account deletion removes every session, including rotated/revoked tokens, atomically. */
+  @Modifying
+  @Query("delete from RefreshToken r where r.user.id = :userId")
+  int deleteAllForUser(@Param("userId") Long userId);
 }

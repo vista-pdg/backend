@@ -6,6 +6,7 @@ import com.vista.pdg.auth.dto.UserDto;
 import com.vista.pdg.auth.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -31,6 +32,7 @@ public class UserAdminController {
   }
 
   @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable Long id) {
     userService.delete(id);
   }

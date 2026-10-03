@@ -22,6 +22,21 @@ public class GlobalExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+  @ExceptionHandler(com.vista.pdg.auth.service.UserService.UserNotFoundException.class)
+  public ResponseEntity<ApiError> handleUserNotFound(RuntimeException ex) {
+    return ResponseEntity.status(404).body(ApiError.of("USER_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(com.vista.pdg.auth.service.RoleService.RoleNotFoundException.class)
+  public ResponseEntity<ApiError> handleRoleNotFound(RuntimeException ex) {
+    return ResponseEntity.status(404).body(ApiError.of("ROLE_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(com.vista.pdg.auth.service.RoleService.RoleInUseException.class)
+  public ResponseEntity<ApiError> handleRoleInUse(RuntimeException ex) {
+    return ResponseEntity.status(409).body(ApiError.of("ROLE_IN_USE", ex.getMessage()));
+  }
+
   // ── Autenticación y registro ────────────────────────────────────────────
 
   /** Errores de Bean Validation: se devuelven por campo para que el formulario los sitúe. */

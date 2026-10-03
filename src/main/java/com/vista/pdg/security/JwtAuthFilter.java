@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,11 +32,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
       String token = header.substring(7);
       if (jwt.isValid(token)) {
         String email = jwt.extractEmail(token);
-        UserDetails user = userDetailsService.loadUserByUsername(email);
-        UsernamePasswordAuthenticationToken auth =
-            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+          UserDetails user = userDetailsService.loadUserByUsername(email);
+          if (user.isEnabled()) {
+            UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(auth);
+          }
+        } catch (UsernameNotFoundException ex) {
+          // An access token may outlive its deleted account; continue unauthenticated (401).
+          SecurityContextHolder.clearContext();
+        }
       }
     }
     chain.doFilter(request, response);

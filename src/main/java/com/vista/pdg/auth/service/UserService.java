@@ -4,6 +4,7 @@ import com.vista.pdg.auth.dto.CreateUserRequest;
 import com.vista.pdg.auth.dto.UserDto;
 import com.vista.pdg.auth.entity.Role;
 import com.vista.pdg.auth.entity.User;
+import com.vista.pdg.auth.repository.RefreshTokenRepository;
 import com.vista.pdg.auth.repository.RoleRepository;
 import com.vista.pdg.auth.repository.UserRepository;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +21,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
+  private final RefreshTokenRepository refreshTokenRepository;
 
   public List<UserDto> findAll() {
     return userRepository.findAll().stream().map(this::toDto).toList();
@@ -46,8 +49,17 @@ public class UserService {
     return toDto(userRepository.save(user));
   }
 
+  @Transactional
   public void delete(Long id) {
-    userRepository.deleteById(id);
+    User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
+    refreshTokenRepository.deleteAllForUser(id);
+    userRepository.delete(user);
+  }
+
+  public static class UserNotFoundException extends RuntimeException {
+    public UserNotFoundException() {
+      super("Este usuario ya no existe. Actualiza la lista de usuarios.");
+    }
   }
 
   public UserDto assignRoles(Long id, List<Long> roleIds) {
