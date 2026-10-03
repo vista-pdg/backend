@@ -218,3 +218,11 @@ pisaba el 403.
 actualiza el contenedor `backend` de Cloud Run (`vista-backend`). Auth sin llaves por Workload
 Identity Federation. La infraestructura, variables y secretos viven en `vista-pdg/terraform-iac`;
 en Cloud Run el backend usa Gemini por Vertex AI con su cuenta de servicio (sin `GEMINI_API_KEY`).
+
+## Verificación de correo al registrarse
+
+Nuevas cuentas requieren confirmar un código enviado al buzón institucional. Usa una cuenta
+Gmail dedicada con contraseña de aplicación o SMTP autorizado; no requiere dominio propio.
+[Configuración y pruebas de correo](docs/email-verification.md) explica `.env`, Mailpit local,
+contratos, límites y Secret Manager. Sin configurar envío, nuevas altas devuelven 503 y el login
+existente continúa funcionando.

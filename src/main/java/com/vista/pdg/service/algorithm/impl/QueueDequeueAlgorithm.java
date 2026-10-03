@@ -7,6 +7,7 @@ import com.vista.pdg.model.generated.Node3D;
 import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.model.response.AlgorithmStep;
 import com.vista.pdg.model.response.StepsResponse;
+import com.vista.pdg.service.algorithm.AlgorithmCode;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.generator.impl.QueueGenerator;
@@ -104,7 +105,7 @@ public class QueueDequeueAlgorithm implements AlgorithmStrategy {
               4,
               vars(String.valueOf(front), queue.size(), served)));
     }
-    return StepsResponse.ok(steps, CODE, "pseudocode");
+    return StepsResponse.ok(steps, CODE, "pseudocode").withJava(AlgorithmCode.queue());
   }
 
   private static Map<String, String> vars(String front, int size, List<Integer> served) {

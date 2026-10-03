@@ -8,6 +8,7 @@ import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.model.response.AlgorithmStep;
 import com.vista.pdg.model.response.AlgorithmStep.Frame;
 import com.vista.pdg.model.response.StepsResponse;
+import com.vista.pdg.service.algorithm.AlgorithmCode;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.layout.impl.graph.TreeLayout3D;
@@ -82,7 +83,7 @@ public class InorderTraversalAlgorithm implements AlgorithmStrategy {
         "Llamada inicial con la raíz.");
     t.inorder(tree.root);
     t.done();
-    return StepsResponse.ok(t.steps, CODE, "pseudocode");
+    return StepsResponse.ok(t.steps, CODE, "pseudocode").withJava(AlgorithmCode.inorder());
   }
 
   // ── Árbol de trabajo ─────────────────────────────────────────────────────

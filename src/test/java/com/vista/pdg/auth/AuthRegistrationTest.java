@@ -32,7 +32,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Ana Restrepo", email, "clave12345", "clave12345", "CEDI-G1"))))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.accessToken").isNotEmpty())
@@ -56,7 +56,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Cifrada", email, "clave12345", "clave12345", "CEDI-G1"))))
         .andExpect(status().isCreated());
 
@@ -75,7 +75,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Mayúsculas",
                             email.toUpperCase(),
                             "clave12345",
@@ -96,7 +96,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Externa", "ana@gmail.com", "clave12345", "clave12345", "CEDI-G1"))))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
@@ -112,7 +112,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Ana", uniqueEmail("mismatch"), "clave12345", "otraclave", "CEDI-G1"))))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.fieldErrors.confirmPassword").exists());
@@ -127,7 +127,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     json(
-                        new RegisterRequest(
+                        verifiedRegistration(
                             "Ana", uniqueEmail("corta"), "corta", "corta", "CEDI-G1"))))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.fieldErrors.password").exists());
@@ -152,7 +152,7 @@ class AuthRegistrationTest extends IntegrationTestSupport {
   @DisplayName("correo ya registrado devuelve 409 y no crea una segunda cuenta")
   void correoDuplicado() throws Exception {
     String email = uniqueEmail("duplicada");
-    String body = json(new RegisterRequest("Ana", email, "clave12345", "clave12345", "CEDI-G1"));
+    String body = json(verifiedRegistration("Ana", email, "clave12345", "clave12345", "CEDI-G1"));
 
     mockMvc
         .perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -172,6 +172,8 @@ class AuthRegistrationTest extends IntegrationTestSupport {
   @DisplayName("el registro nunca concede TEACHER ni ADMIN, aunque sea lo que más se intentaría")
   void registroNoConcedeRolesElevados() throws Exception {
     String email = uniqueEmail("escalada");
+    RegisterRequest verified =
+        verifiedRegistration("Escalada", email, "clave12345", "clave12345", "CEDI-G1");
 
     mockMvc
         .perform(
@@ -180,12 +182,22 @@ class AuthRegistrationTest extends IntegrationTestSupport {
                 .content(
                     json(
                         Map.of(
-                            "displayName", "Escalada",
-                            "email", email,
-                            "password", "clave12345",
-                            "confirmPassword", "clave12345",
-                            "courseCode", "CEDI-G1",
-                            "roles", java.util.List.of("ADMIN", "TEACHER")))))
+                            "displayName",
+                            "Escalada",
+                            "email",
+                            email,
+                            "password",
+                            "clave12345",
+                            "confirmPassword",
+                            "clave12345",
+                            "courseCode",
+                            "CEDI-G1",
+                            "roles",
+                            java.util.List.of("ADMIN", "TEACHER"),
+                            "verificationId",
+                            verified.verificationId(),
+                            "verificationCode",
+                            verified.verificationCode()))))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.roles[0]").value("STUDENT"))
         .andExpect(jsonPath("$.roles.length()").value(1));

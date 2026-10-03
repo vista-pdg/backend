@@ -18,4 +18,9 @@ public record AuthResponse(
     List<String> roles,
     /** Nulos cuando la cuenta no está vinculada a un curso (docente, administrador). */
     String courseCode,
-    String termCode) {}
+    String termCode) {
+  @Override
+  public String toString() {
+    return "AuthResponse[redacted]";
+  }
+}

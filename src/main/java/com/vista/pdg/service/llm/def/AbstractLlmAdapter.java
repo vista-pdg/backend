@@ -1,8 +1,10 @@
 package com.vista.pdg.service.llm.def;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.exception.InvalidContractException;
 import com.vista.pdg.exception.LlmExhaustedException;
 import com.vista.pdg.exception.LlmUnavailableException;
+import com.vista.pdg.exception.UnsupportedStructureException;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.model.response.StructureResponse.AttemptDetail;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
@@ -50,8 +52,14 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
         String raw = callModel(systemPrompt, prompt);
         String json = sanitize(raw);
         log.debug("LLM attempt {} raw response: {}", attempt, raw);
+        if ("OUT_OF_SCOPE".equals(new ObjectMapper().readTree(json).path("error").asText())) {
+          throw new UnsupportedStructureException(
+              "El asistente solo atiende estructuras y operaciones compatibles con VISTA.");
+        }
         return contractBuilder.build(json);
 
+      } catch (UnsupportedStructureException e) {
+        throw e;
       } catch (LlmUnavailableException e) {
         // Créditos, cuota o clave: el mismo prompt no va a funcionar en un segundo intento.
         throw e;

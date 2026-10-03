@@ -1,16 +1,24 @@
 package com.vista.pdg.auth.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
+import java.util.UUID;
 
 public record RegisterRequest(
-    @NotBlank(message = "El nombre es obligatorio")
-        @Size(max = 120, message = "El nombre no puede superar 120 caracteres")
-        String displayName,
-    @NotBlank(message = "El correo es obligatorio")
-        @Email(message = "El correo no tiene un formato válido")
-        String email,
-    @NotBlank(message = "La contraseña es obligatoria") String password,
-    @NotBlank(message = "Debes confirmar la contraseña") String confirmPassword,
-    @NotBlank(message = "Selecciona el curso al que perteneces") String courseCode) {}
+    @NotBlank(message = "El nombre es obligatorio") @Size(max = 120) String displayName,
+    @NotBlank(message = "El correo es obligatorio") @Email @Size(max = 254) String email,
+    @NotBlank(message = "La contraseña es obligatoria") @Size(max = 72) String password,
+    @NotBlank(message = "Debes confirmar la contraseña") @Size(max = 72) String confirmPassword,
+    @NotBlank(message = "Selecciona el curso al que perteneces") String courseCode,
+    @NotNull(message = "Solicita primero el código de verificación") UUID verificationId,
+    @NotBlank(message = "Introduce el código enviado a tu correo")
+        @Pattern(regexp = "[0-9]{6}", message = "Introduce los 6 dígitos del código")
+        String verificationCode) {
+  public RegistrationIntent intent() {
+    return new RegistrationIntent(displayName, email, password, confirmPassword, courseCode);
+  }
+
+  @Override
+  public String toString() {
+    return "RegisterRequest[redacted]";
+  }
+}

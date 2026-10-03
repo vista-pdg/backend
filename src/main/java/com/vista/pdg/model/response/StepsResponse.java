@@ -7,16 +7,25 @@ import java.util.List;
  * líneas referencian los pasos; nulos en los algoritmos no instrumentados.
  */
 public record StepsResponse(
-    boolean error, String message, List<AlgorithmStep> steps, List<String> code, String language) {
+    boolean error,
+    String message,
+    List<AlgorithmStep> steps,
+    List<String> code,
+    String language,
+    List<CodeRepresentation> representations) {
   public static StepsResponse ok(List<AlgorithmStep> steps) {
-    return new StepsResponse(false, null, steps, null, null);
+    return new StepsResponse(false, null, steps, null, null, List.of());
   }
 
   public static StepsResponse ok(List<AlgorithmStep> steps, List<String> code, String language) {
-    return new StepsResponse(false, null, steps, code, language);
+    return new StepsResponse(false, null, steps, code, language, List.of());
+  }
+
+  public StepsResponse withJava(CodeRepresentation java) {
+    return new StepsResponse(error, message, steps, code, language, List.of(java));
   }
 
   public static StepsResponse error(String message) {
-    return new StepsResponse(true, message, null, null, null);
+    return new StepsResponse(true, message, null, null, null, List.of());
   }
 }

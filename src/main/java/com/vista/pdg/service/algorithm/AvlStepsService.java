@@ -13,6 +13,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class AvlStepsService {
 
+  public static final List<String> CODE =
+      List.of(
+          "insertarAVL(valores):",
+          "  raíz ← nulo",
+          "  para cada valor: insertar según la regla BST",
+          "    comprobar factores de balance en el camino",
+          "    rotarIzquierda(pivote) si corresponde",
+          "    rotarDerecha(pivote) si corresponde",
+          "    retornar árbol balanceado tras la inserción");
+
   private final TreeLayout3D treeLayout;
 
   public AvlStepsService(TreeLayout3D treeLayout) {
@@ -38,7 +48,8 @@ public class AvlStepsService {
             "initial",
             List.of(),
             null,
-            null));
+            null,
+            2));
 
     for (int v : values) {
       List<RotationEvent> rotations = new ArrayList<>();
@@ -56,7 +67,8 @@ public class AvlStepsService {
                 "insert",
                 List.of(nid(v)),
                 null,
-                root));
+                root,
+                3));
       } else {
         AvlNode bstState = bstInsert(deepClone(root), v);
         steps.add(
@@ -69,7 +81,8 @@ public class AvlStepsService {
                 "insert",
                 List.of(nid(v)),
                 null,
-                bstState));
+                bstState,
+                3));
 
         AvlNode working = deepClone(bstState);
         updateAllHeights(working);
@@ -89,7 +102,8 @@ public class AvlStepsService {
                   "unbalanced",
                   List.of(nid(re.pivotValue())),
                   re.rotationType(),
-                  working));
+                  working,
+                  4));
 
           working = applyRotationAt(working, re.pivotValue(), re.direction());
           updateAllHeights(working);
@@ -104,7 +118,8 @@ public class AvlStepsService {
                   "rotated",
                   List.of(nid(re.newRootValue())),
                   null,
-                  working));
+                  working,
+                  "left".equals(re.direction()) ? 5 : 6));
         }
 
         root = avlInsert(root, v);
@@ -116,11 +131,12 @@ public class AvlStepsService {
                 "balanced",
                 List.of(nid(v)),
                 null,
-                root));
+                root,
+                7));
       }
     }
 
-    return StepsResponse.ok(steps);
+    return StepsResponse.ok(steps, CODE, "pseudocode");
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -136,7 +152,8 @@ public class AvlStepsService {
       String highlightType,
       List<String> highlightedIds,
       String rotationType,
-      AvlNode root) {
+      AvlNode root,
+      int line) {
 
     List<Node3D> nodes = new ArrayList<>();
     List<Edge3D> edges = new ArrayList<>();
@@ -156,7 +173,7 @@ public class AvlStepsService {
     }
 
     return new AlgorithmStep(
-        index, title, description, highlightType, highlightedIds, rotationType, nodes, edges);
+        index, title, description, highlightType, highlightedIds, rotationType, nodes, edges, line);
   }
 
   private void buildSnapshot(

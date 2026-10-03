@@ -5,6 +5,8 @@ import com.vista.pdg.academic.service.CourseService;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
 import com.vista.pdg.auth.dto.RegisterRequest;
+import com.vista.pdg.auth.dto.RegistrationIntent;
+import com.vista.pdg.auth.dto.VerificationResponse;
 import com.vista.pdg.auth.entity.Role;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.auth.repository.RoleRepository;
@@ -12,7 +14,10 @@ import com.vista.pdg.auth.repository.UserRepository;
 import com.vista.pdg.exception.EmailAlreadyUsedException;
 import com.vista.pdg.exception.RegistrationValidationException;
 import com.vista.pdg.exception.TokenReuseDetectedException;
+import com.vista.pdg.exception.VerificationException;
+import com.vista.pdg.exception.VerificationRateException;
 import com.vista.pdg.security.JwtTokenProvider;
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +25,7 @@ import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,6 +47,9 @@ public class AuthService {
   private final JwtTokenProvider jwt;
   private final RefreshTokenService refreshTokenService;
   private final CourseService courseService;
+  private final EmailVerificationService verification;
+  private final VerificationMailer mailer;
+  private final Clock clock;
 
   @Value("${auth.allowed-email-domains:}")
   private String allowedEmailDomains;
@@ -48,23 +57,14 @@ public class AuthService {
   @Value("${auth.min-password-length:8}")
   private int minPasswordLength;
 
-  @Transactional
+  @Transactional(noRollbackFor = VerificationException.class)
   public AuthResponse register(RegisterRequest req) {
+    Course course = validateIntent(req.intent());
     String email = normalize(req.email());
-
-    if (!req.password().equals(req.confirmPassword())) {
-      throw new RegistrationValidationException("confirmPassword", "Las contraseñas no coinciden");
-    }
-    if (req.password().length() < minPasswordLength) {
-      throw new RegistrationValidationException(
-          "password", "La contraseña debe tener al menos " + minPasswordLength + " caracteres");
-    }
-    requireAllowedDomain(email);
-    if (userRepository.existsByEmail(email)) {
+    // El duplicado conserva el contrato anterior; ningún registro nuevo omite la verificación.
+    if (userRepository.existsByEmail(email))
       throw new EmailAlreadyUsedException("Ya existe una cuenta con ese correo");
-    }
-    // HU-16: toda cuenta de estudiante nace vinculada a un curso del periodo activo.
-    Course course = courseService.requireEnrollable(req.courseCode());
+    verification.consume(email, req.verificationId(), req.verificationCode());
 
     Role studentRole =
         roleRepository
@@ -84,9 +84,33 @@ public class AuthService {
                 .roles(new HashSet<>(Set.of(studentRole)))
                 .course(course)
                 .enabled(true)
+                .emailVerifiedAt(clock.instant())
                 .build());
 
     return issueFor(user);
+  }
+
+  public VerificationResponse requestVerification(RegistrationIntent req) {
+    validateIntent(req);
+    if (userRepository.existsByEmail(normalize(req.email())))
+      throw new EmailAlreadyUsedException("Ya existe una cuenta con ese correo");
+    mailer.checkConfigured();
+    try {
+      return verification.send(normalize(req.email()));
+    } catch (DataIntegrityViolationException ex) {
+      // Carrera de primera inserción: no enviar duplicados ni exponer restricciones SQL.
+      throw new VerificationRateException(1);
+    }
+  }
+
+  private Course validateIntent(RegistrationIntent req) {
+    if (!req.password().equals(req.confirmPassword()))
+      throw new RegistrationValidationException("confirmPassword", "Las contraseñas no coinciden");
+    if (req.password().length() < minPasswordLength)
+      throw new RegistrationValidationException(
+          "password", "La contraseña debe tener al menos " + minPasswordLength + " caracteres");
+    requireAllowedDomain(normalize(req.email()));
+    return courseService.requireEnrollable(req.courseCode());
   }
 
   @Transactional

@@ -43,6 +43,27 @@ public class GlobalExceptionHandler {
                 "VALIDATION_ERROR", ex.getMessage(), Map.of(ex.field(), ex.getMessage())));
   }
 
+  @ExceptionHandler(VerificationException.class)
+  public ResponseEntity<ApiError> handleVerification(VerificationException ex) {
+    return ResponseEntity.unprocessableEntity()
+        .body(
+            ApiError.field(
+                ex.getCode(), ex.getMessage(), Map.of("verificationCode", ex.getMessage())));
+  }
+
+  @ExceptionHandler(VerificationRateException.class)
+  public ResponseEntity<ApiError> handleVerificationRate(VerificationRateException ex) {
+    return ResponseEntity.status(429)
+        .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+        .body(ApiError.of("VERIFICATION_RATE_LIMITED", ex.getMessage()));
+  }
+
+  @ExceptionHandler(VerificationMailException.class)
+  public ResponseEntity<ApiError> handleVerificationMail(VerificationMailException ex) {
+    return ResponseEntity.status(503)
+        .body(ApiError.of("VERIFICATION_MAIL_UNAVAILABLE", ex.getMessage()));
+  }
+
   @ExceptionHandler(EmailAlreadyUsedException.class)
   public ResponseEntity<ApiError> handleEmailTaken(EmailAlreadyUsedException ex) {
     return ResponseEntity.status(409)

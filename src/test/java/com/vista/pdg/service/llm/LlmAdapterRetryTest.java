@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.exception.LlmExhaustedException;
 import com.vista.pdg.exception.LlmUnavailableException;
+import com.vista.pdg.exception.UnsupportedStructureException;
 import com.vista.pdg.model.contract.TreeContract;
 import com.vista.pdg.model.contract.def.StructureContract;
 import com.vista.pdg.service.llm.def.AbstractLlmAdapter;
@@ -94,6 +95,13 @@ class LlmAdapterRetryTest {
     assertThatThrownBy(() -> a.generate("x"))
         .isInstanceOf(LlmExhaustedException.class)
         .satisfies(e -> assertThat(((LlmExhaustedException) e).attempts()).hasSize(3));
+  }
+
+  @Test
+  void outOfScopeIsNotRetried() {
+    ScriptedAdapter a = new ScriptedAdapter("{\"error\":\"OUT_OF_SCOPE\"}");
+    assertThatThrownBy(() -> a.generate("grafo")).isInstanceOf(UnsupportedStructureException.class);
+    assertThat(a.prompts).hasSize(1);
   }
 
   @Test

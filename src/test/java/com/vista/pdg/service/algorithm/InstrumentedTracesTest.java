@@ -173,9 +173,9 @@ class InstrumentedTracesTest {
         .containsEntry("atendidos", "[]");
     assertThat(q.steps().getLast().variables()).containsEntry("atendidos", "[5, 9]");
 
-    // El AVL de HU-19 sigue sin instrumentar y sigue siendo válido.
+    // AVL conserva su rastro y ahora incluye código instrumentado.
     StepsResponse a = avl.generate(new AlgorithmRequest("tree", "avl", "insert", List.of(3, 2, 1)));
-    assertThat(a.code()).isNull();
-    assertThat(a.steps()).allSatisfy(s -> assertThat(s.line()).isNull());
+    assertThat(a.code()).isEqualTo(AvlStepsService.CODE);
+    assertThat(a.steps()).allSatisfy(s -> assertThat(s.line()).isBetween(1, 7));
   }
 }

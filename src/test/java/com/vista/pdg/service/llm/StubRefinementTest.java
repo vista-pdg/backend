@@ -70,6 +70,21 @@ class StubRefinementTest {
   }
 
   @Test
+  void selectedStructureBlockDoesNotResetRefinement() throws Exception {
+    TreeContract before =
+        new TreeContract(
+            "tree",
+            null,
+            "avl",
+            List.of(new TreeContract.Operation("insert", List.of(10, 5, 3))),
+            null);
+    String prompt =
+        "SELECTED STRUCTURE: tree/avl\nUSER DATA (describe only this selected structure):\ninserta el 7";
+    TreeContract after = (TreeContract) stub.generate(prompt, ctx(before));
+    assertThat(after.operations().getFirst().values()).containsExactly(10, 5, 3, 7);
+  }
+
+  @Test
   @DisplayName("CA-2: «hazlo dirigido» conserva etiquetas y aristas, una sola dirección por par")
   void refinesGraphDirection() throws Exception {
     GraphContract cycle =

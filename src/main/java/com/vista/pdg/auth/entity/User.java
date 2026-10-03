@@ -32,6 +32,9 @@ public class User implements UserDetails {
   @Column(nullable = false)
   private String password;
 
+  /** Nulo en cuentas existentes/provisionadas; no se inventa una verificación histórica. */
+  private java.time.Instant emailVerifiedAt;
+
   @Builder.Default private boolean enabled = true;
 
   @ManyToMany(fetch = FetchType.EAGER)

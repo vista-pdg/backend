@@ -36,7 +36,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * lleva a ninguna parte.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(FakeLlmConfig.class)
+@Import({FakeLlmConfig.class, com.vista.pdg.testsupport.FakeVerificationMailConfig.class})
 @TestPropertySource(
     properties = {
       "gemini.api.key=test-key-no-usada",
@@ -64,6 +64,8 @@ class HttpStatusContractTest {
   @LocalServerPort private int port;
 
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private com.vista.pdg.auth.service.EmailVerificationService verification;
+  @Autowired private com.vista.pdg.testsupport.FakeVerificationMailConfig.CapturingMailer mailer;
   @Autowired private com.vista.pdg.academic.repository.CourseRepository courseRepository;
   @Autowired private com.vista.pdg.academic.repository.AcademicTermRepository termRepository;
 
@@ -194,6 +196,14 @@ class HttpStatusContractTest {
             + email
             + "\",\"password\":\"clave12345\",\"confirmPassword\":\"clave12345\",\"courseCode\":\""
             + courseCode
+            + "\"}";
+    var receipt = verification.send(email);
+    body =
+        body.substring(0, body.length() - 1)
+            + ",\"verificationId\":\""
+            + receipt.verificationId()
+            + "\",\"verificationCode\":\""
+            + mailer.code(email)
             + "\"}";
     HttpResponse<String> res = send("POST", "/api/auth/register", null, body);
     assertThat(res.statusCode()).isEqualTo(201);

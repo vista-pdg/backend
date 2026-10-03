@@ -5,6 +5,7 @@ import com.vista.pdg.model.generated.Edge3D;
 import com.vista.pdg.model.generated.Node3D;
 import com.vista.pdg.model.response.AlgorithmStep;
 import com.vista.pdg.model.response.StepsResponse;
+import com.vista.pdg.service.algorithm.AlgorithmCode;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import java.util.ArrayDeque;
@@ -193,7 +194,7 @@ public class GraphBfsAlgorithm implements AlgorithmStrategy {
             state,
             8,
             vars.apply(null)));
-    return StepsResponse.ok(steps, CODE, "pseudocode");
+    return StepsResponse.ok(steps, CODE, "pseudocode").withJava(AlgorithmCode.bfs());
   }
 
   private static Map<String, List<String>> adjacency(List<Node3D> nodes, List<Edge3D> edges) {

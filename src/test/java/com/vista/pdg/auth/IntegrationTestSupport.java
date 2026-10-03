@@ -33,13 +33,22 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({FakeLlmConfig.class, MutableClockConfig.class})
+@Import({
+  FakeLlmConfig.class,
+  MutableClockConfig.class,
+  com.vista.pdg.testsupport.FakeVerificationMailConfig.class
+})
 @TestPropertySource(
     properties = {
       // Evita que el arranque del contexto dependa de un .env con clave real de Gemini.
       "gemini.api.key=test-key-no-usada",
       "auth.allowed-email-domains=u.icesi.edu.co,icesi.edu.co",
       "auth.min-password-length=8",
+      "auth.verification.hash-secret=isolated-test-verification-secret-at-least-32chars",
+      "auth.verification.cooldown=PT0S",
+      "auth.verification.email-hourly-limit=10000",
+      "auth.verification.hourly-limit=10000",
+      "auth.verification.daily-limit=100000",
       // El limitador de tasa se prueba aparte con su propio reloj. Aquí se sube para que las suites
       // que generan varias veces seguidas con la misma cuenta (telemetría) no choquen con él.
       "assistant.rate.per-minute=1000",
@@ -94,6 +103,24 @@ public abstract class IntegrationTestSupport {
     org.assertj.core.api.Assertions.assertThat(POSTGRES.isRunning()).isTrue();
   }
 
+  @Autowired protected com.vista.pdg.auth.service.EmailVerificationService emailVerification;
+
+  @Autowired
+  protected com.vista.pdg.testsupport.FakeVerificationMailConfig.CapturingMailer verificationMail;
+
+  protected RegisterRequest verifiedRegistration(
+      String name, String email, String password, String confirmation, String course) {
+    var receipt = emailVerification.send(email.strip().toLowerCase(java.util.Locale.ROOT));
+    return new RegisterRequest(
+        name,
+        email,
+        password,
+        confirmation,
+        course,
+        receipt.verificationId(),
+        verificationMail.code(email));
+  }
+
   protected String json(Object value) {
     try {
       return objectMapper.writeValueAsString(value);
@@ -114,7 +141,7 @@ public abstract class IntegrationTestSupport {
                     .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                     .content(
                         json(
-                            new RegisterRequest(
+                            verifiedRegistration(
                                 "Prueba " + emailPrefix,
                                 uniqueEmail(emailPrefix),
                                 "clave12345",

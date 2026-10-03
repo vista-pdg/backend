@@ -41,6 +41,7 @@ public class SecurityConfig {
                     // un token de acceso: en /refresh y /logout lo normal es que ya haya expirado.
                     .requestMatchers(
                         "/api/auth/register",
+                        "/api/auth/registration-code",
                         "/api/auth/login",
                         "/api/auth/refresh",
                         "/api/auth/logout")

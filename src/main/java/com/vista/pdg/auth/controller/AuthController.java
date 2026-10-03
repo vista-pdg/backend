@@ -4,6 +4,8 @@ import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.dto.LoginRequest;
 import com.vista.pdg.auth.dto.RefreshRequest;
 import com.vista.pdg.auth.dto.RegisterRequest;
+import com.vista.pdg.auth.dto.RegistrationIntent;
+import com.vista.pdg.auth.dto.VerificationResponse;
 import com.vista.pdg.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,12 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
   private final AuthService authService;
+
+  @PostMapping("/registration-code")
+  public ResponseEntity<VerificationResponse> requestCode(
+      @Valid @RequestBody RegistrationIntent req) {
+    return ResponseEntity.status(HttpStatus.ACCEPTED).body(authService.requestVerification(req));
+  }
 
   @PostMapping("/register")
   public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest req) {

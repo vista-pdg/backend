@@ -6,6 +6,7 @@ import com.vista.pdg.model.generated.Node3D;
 import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.model.response.AlgorithmStep;
 import com.vista.pdg.model.response.StepsResponse;
+import com.vista.pdg.service.algorithm.AlgorithmCode;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
 import com.vista.pdg.service.generator.impl.StackGenerator;
@@ -100,7 +101,7 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
               4,
               vars(String.valueOf(top), stack.size(), removed)));
     }
-    return StepsResponse.ok(steps, CODE, "pseudocode");
+    return StepsResponse.ok(steps, CODE, "pseudocode").withJava(AlgorithmCode.stack());
   }
 
   private static Map<String, String> vars(String top, int size, List<Integer> removed) {

@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.vista.pdg.auth.IntegrationTestSupport;
 import com.vista.pdg.auth.dto.AuthResponse;
-import com.vista.pdg.auth.dto.RegisterRequest;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.auth.repository.UserRepository;
 import com.vista.pdg.telemetry.dto.EventView;
@@ -74,7 +73,7 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         json(
-                            new RegisterRequest(
+                            verifiedRegistration(
                                 "Prueba analítica", email, "clave12345", "clave12345", "CEDI-G1"))))
             .andReturn()
             .getResponse()
@@ -191,7 +190,7 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
     String token = studentToken();
     String prompt = "dibuja un fractal fuera de alcance por favor";
 
-    generate(token, prompt, 503);
+    generate(token, prompt, 400);
 
     GenerationEvent ev = minesOf(STUDENT_EMAIL).getLast();
     assertThat(ev.getOutcome()).isEqualTo("fuera_de_alcance");

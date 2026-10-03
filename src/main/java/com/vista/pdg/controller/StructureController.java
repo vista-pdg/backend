@@ -3,6 +3,7 @@ package com.vista.pdg.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vista.pdg.assistant.dto.QuotaStatus;
 import com.vista.pdg.assistant.service.AssistantQuotaService;
+import com.vista.pdg.assistant.service.AssistantScopeService;
 import com.vista.pdg.assistant.session.AssistantSessionService;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.controller.dto.GenerateRequest;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class StructureController {
+  private final AssistantScopeService scopeService;
 
   private final LlmAdapter llmAdapter;
   private final GeneratorDispatcher generatorDispatcher;
@@ -49,7 +51,8 @@ public class StructureController {
       TelemetryService telemetryService,
       AssistantQuotaService quotaService,
       AssistantSessionService sessionService,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      AssistantScopeService scopeService) {
     this.llmAdapter = llmAdapter;
     this.generatorDispatcher = generatorDispatcher;
     this.layoutDispatcher = layoutDispatcher;
@@ -57,6 +60,7 @@ public class StructureController {
     this.quotaService = quotaService;
     this.sessionService = sessionService;
     this.objectMapper = objectMapper;
+    this.scopeService = scopeService;
   }
 
   @PostMapping("/generate")
@@ -65,18 +69,27 @@ public class StructureController {
       @RequestHeader(value = VisualizationMode.HEADER, required = false) String mode,
       @AuthenticationPrincipal User user) {
     // HU-17: la reserva va ANTES del modelo. Un 429 nunca produce una llamada facturable.
-    QuotaStatus quota = quotaService.reserve(user);
 
     // HU-32: la sesión de trabajo, si la hay, viaja como contexto. Sin ella (o sin Redis) esto es
     // exactamente la generación de siempre.
     ConversationContext context = sessionService.contextFor(user.getId());
     // HU-21 · CA-4: todos los eventos de esta petición comparten la sesión de trabajo.
     String sessionId = sessionService.ensureSessionId(user.getId());
+    try {
+      scopeService.validate(req, context);
+    } catch (RuntimeException e) {
+      telemetryService.recordFailedGeneration(user, req.prompt(), outcomeOf(e), mode, sessionId);
+      throw e;
+    }
+    QuotaStatus quota = quotaService.reserve(user);
 
     StructureContract contract;
     GeneratedStructure structure;
     try {
-      contract = llmAdapter.generate(req.prompt(), context);
+      contract =
+          llmAdapter.generate(
+              scopeService.modelPrompt(req), scopeService.selectedContext(req, context));
+      scopeService.verifyResult(req, contract);
       structure = generatorDispatcher.dispatch(contract);
     } catch (RuntimeException e) {
       // HU-21 · CA-3: lo que el estudiante pidió y no obtuvo también es un dato. Se distingue lo

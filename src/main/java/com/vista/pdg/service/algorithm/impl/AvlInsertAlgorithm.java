@@ -2,6 +2,7 @@ package com.vista.pdg.service.algorithm.impl;
 
 import com.vista.pdg.controller.dto.AlgorithmRequest;
 import com.vista.pdg.model.response.StepsResponse;
+import com.vista.pdg.service.algorithm.AlgorithmCode;
 import com.vista.pdg.service.algorithm.AvlStepsService;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import com.vista.pdg.service.algorithm.def.AlgorithmStrategy;
@@ -33,6 +34,6 @@ public class AvlInsertAlgorithm implements AlgorithmStrategy {
 
   @Override
   public StepsResponse generate(AlgorithmRequest request) {
-    return avl.generateAvlInsertSteps(request.values());
+    return avl.generateAvlInsertSteps(request.values()).withJava(AlgorithmCode.avl());
   }
 }

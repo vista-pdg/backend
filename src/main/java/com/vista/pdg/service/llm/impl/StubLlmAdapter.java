@@ -78,7 +78,12 @@ public class StubLlmAdapter implements LlmAdapter {
    */
   @Override
   public StructureContract generate(String userPrompt, ConversationContext context) {
-    String lower = userPrompt == null ? "" : userPrompt.toLowerCase();
+    String data = userPrompt;
+    String marker = "\nUSER DATA (describe only this selected structure):\n";
+    if (data != null && data.startsWith("SELECTED STRUCTURE: ") && data.contains(marker)) {
+      data = data.substring(data.indexOf(marker) + marker.length());
+    }
+    String lower = data == null ? "" : data.toLowerCase();
     if (context == null || context.currentContract() == null || describesNewStructure(lower)) {
       return generate(userPrompt);
     }

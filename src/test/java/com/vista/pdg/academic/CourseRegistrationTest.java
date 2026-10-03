@@ -11,7 +11,6 @@ import com.vista.pdg.academic.entity.Course;
 import com.vista.pdg.academic.repository.AcademicTermRepository;
 import com.vista.pdg.academic.repository.CourseRepository;
 import com.vista.pdg.auth.IntegrationTestSupport;
-import com.vista.pdg.auth.dto.RegisterRequest;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.auth.repository.UserRepository;
 import java.util.Map;
@@ -37,7 +36,7 @@ class CourseRegistrationTest extends IntegrationTestSupport {
 
   private String body(String email, String courseCode) {
     return json(
-        new RegisterRequest("Ricardo Urbina", email, "clave12345", "clave12345", courseCode));
+        verifiedRegistration("Ricardo Urbina", email, "clave12345", "clave12345", courseCode));
   }
 
   // ── Antecedentes ─────────────────────────────────────────────────────────
