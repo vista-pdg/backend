@@ -26,8 +26,12 @@ class AlgorithmCatalogTest extends IntegrationTestSupport {
     mockMvc
         .perform(get("/api/algorithm/catalog").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(5))
-        .andExpect(jsonPath("$[?(@.family=='graph')].operation").value("bfs"))
+        .andExpect(jsonPath("$.length()").value(10))
+        .andExpect(
+            jsonPath("$[?(@.family=='graph')].operation")
+                .value(
+                    org.hamcrest.Matchers.containsInAnyOrder(
+                        "bfs", "dfs", "dijkstra", "floyd", "prim", "kruskal")))
         .andExpect(jsonPath("$[?(@.family=='stack')].operation").value("pop"))
         .andExpect(jsonPath("$[?(@.family=='queue')].operation").value("dequeue"))
         .andExpect(jsonPath("$[?(@.operation=='insert')].family").value("tree"))

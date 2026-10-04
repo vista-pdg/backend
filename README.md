@@ -112,6 +112,31 @@ Escribir un evento nunca puede tumbar la petición que lo produjo: `TelemetrySer
 transacción propia (`REQUIRES_NEW`) **dentro** del `try`, de modo que un fallo al confirmar también
 queda atrapado y sólo llega al log.
 
+### Algoritmos de grafos
+
+`GET /api/algorithm/catalog` incluye seis operaciones con `type=graph`, `subtype=simple`
+e `input=structure`. `POST /api/algorithm/steps` recibe los nodos y aristas del lienzo;
+las posiciones y propiedades originales se conservan en cada instantánea.
+
+| Operación | Resultado | Condiciones |
+|---|---|---|
+| `bfs` | Recorrido en anchura | Desde `start`; respeta direcciones |
+| `dfs` | Recorrido en profundidad con pila | Desde `start`; respeta direcciones |
+| `dijkstra` | Distancias mínimas y predecesores | Desde `start`; pesos no negativos |
+| `floyd` | Matriz de distancias entre todos los pares | Sin origen; hasta 40 nodos; rechaza ciclos negativos |
+| `prim` | Árbol o bosque de expansión mínima y costo | No dirigido; comienza en `start` |
+| `kruskal` | Árbol o bosque de expansión mínima y costo | No dirigido; sin origen |
+
+Un peso ausente vale 1; cero es un peso válido. Dijkstra y Floyd usan `long` para las
+sumas y muestran `∞` cuando no existe camino. Prim y Kruskal aceptan pesos negativos
+y procesan todas las componentes, incluidos nodos aislados. Los empates conservan el
+orden de nodos/aristas recibido para reproducir el mismo rastro en 2D y 3D.
+
+Los cinco algoritmos nuevos incluyen pseudocódigo y variables sincronizadas. Floyd emite
+una matriz por nodo intermedio, en lugar de una instantánea por cada comparación de pares,
+para acotar el volumen del rastro. El resultado de Prim/Kruskal enumera las aristas elegidas
+y conserva el grafo completo en el lienzo.
+
 ### Generación por el asistente: de texto libre a contrato fijo
 
 El modelo no es determinista, así que la cadena que lo rodea sí lo es:
