@@ -18,9 +18,21 @@ public record AlgorithmRequest(
     List<Integer> values,
     List<Node3D> nodes,
     List<Edge3D> edges,
-    String start) {
+    String start,
+    Double argument) {
+
+  public AlgorithmRequest(
+      String type,
+      String subtype,
+      String operation,
+      List<Integer> values,
+      List<Node3D> nodes,
+      List<Edge3D> edges,
+      String start) {
+    this(type, subtype, operation, values, nodes, edges, start, null);
+  }
 
   public AlgorithmRequest(String type, String subtype, String operation, List<Integer> values) {
-    this(type, subtype, operation, values, null, null, null);
+    this(type, subtype, operation, values, null, null, null, null);
   }
 }
