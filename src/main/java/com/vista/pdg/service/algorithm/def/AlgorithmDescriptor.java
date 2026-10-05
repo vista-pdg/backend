@@ -11,7 +11,41 @@ public record AlgorithmDescriptor(
     String family,
     String label,
     String description,
-    String input) {
+    String input,
+    String parameter,
+    Integer maxValues) {
+
+  public AlgorithmDescriptor(
+      String type,
+      String subtype,
+      String operation,
+      String family,
+      String label,
+      String description,
+      String input,
+      String parameter) {
+    this(
+        type,
+        subtype,
+        operation,
+        family,
+        label,
+        description,
+        input,
+        parameter,
+        "values".equals(input) ? 64 : null);
+  }
+
+  public AlgorithmDescriptor(
+      String type,
+      String subtype,
+      String operation,
+      String family,
+      String label,
+      String description,
+      String input) {
+    this(type, subtype, operation, family, label, description, input, null);
+  }
 
   public String key() {
     return type + "/" + subtype + "/" + operation;

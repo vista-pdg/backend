@@ -26,13 +26,28 @@ class AlgorithmCatalogTest extends IntegrationTestSupport {
     mockMvc
         .perform(get("/api/algorithm/catalog").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(5))
-        .andExpect(jsonPath("$[?(@.family=='graph')].operation").value("bfs"))
-        .andExpect(jsonPath("$[?(@.family=='stack')].operation").value("pop"))
-        .andExpect(jsonPath("$[?(@.family=='queue')].operation").value("dequeue"))
-        .andExpect(jsonPath("$[?(@.operation=='insert')].family").value("tree"))
+        .andExpect(jsonPath("$.length()").value(43))
+        .andExpect(
+            jsonPath("$[?(@.family=='graph')].operation")
+                .value(
+                    org.hamcrest.Matchers.containsInAnyOrder(
+                        "bfs", "dfs", "dijkstra", "floyd", "prim", "kruskal")))
+        .andExpect(
+            jsonPath("$[?(@.family=='stack')].operation")
+                .value(org.hamcrest.Matchers.containsInAnyOrder("pop", "push", "peek")))
+        .andExpect(
+            jsonPath("$[?(@.family=='queue')].operation")
+                .value(org.hamcrest.Matchers.containsInAnyOrder("dequeue", "enqueue", "peek")))
+        .andExpect(
+            jsonPath("$[?(@.type=='tree' && @.subtype=='avl' && @.operation=='insert')].family")
+                .value("tree"))
         .andExpect(jsonPath("$[?(@.operation=='inorder')].family").value("tree"))
         .andExpect(jsonPath("$[?(@.operation=='bfs')].input").value("structure"))
+        .andExpect(jsonPath("$[?(@.family=='sorting')]").value(org.hamcrest.Matchers.hasSize(6)))
+        .andExpect(jsonPath("$[?(@.family=='heap')]").value(org.hamcrest.Matchers.hasSize(4)))
+        .andExpect(
+            jsonPath("$[?(@.family=='linked-list')]").value(org.hamcrest.Matchers.hasSize(5)))
+        .andExpect(jsonPath("$[?(@.family=='hash-table')]").value(org.hamcrest.Matchers.hasSize(3)))
         .andExpect(jsonPath("$[*].label").isArray());
   }
 
@@ -99,5 +114,22 @@ class AlgorithmCatalogTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.steps.length()").value(5))
         .andExpect(jsonPath("$.steps[0].nodes[0].properties.role").value("front"))
         .andExpect(jsonPath("$.steps[0].edges.length()").value(1));
+  }
+
+  @Test
+  void newOperationsRequireSessionAndRejectFractionalArguments() throws Exception {
+    String body =
+        "{\"type\":\"tree\",\"subtype\":\"bst\",\"operation\":\"search\",\"argument\":1.5}";
+    mockMvc
+        .perform(post("/api/algorithm/steps").contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isUnauthorized());
+    String token = login(STUDENT_EMAIL, STUDENT_PASSWORD).accessToken();
+    mockMvc
+        .perform(
+            post("/api/algorithm/steps")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
   }
 }

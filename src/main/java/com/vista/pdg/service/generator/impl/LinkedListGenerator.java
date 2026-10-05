@@ -27,7 +27,16 @@ public class LinkedListGenerator implements StructureGenerator<LinkedListContrac
     List<Edge3D> edges = new ArrayList<>();
 
     for (int i = 0; i < values.size(); i++) {
-      nodes.add(new Node3D("n" + i, String.valueOf(values.get(i)), 0, 0, 0, 0, null, Map.of()));
+      nodes.add(
+          new Node3D(
+              "n" + i,
+              String.valueOf(values.get(i)),
+              0,
+              0,
+              0,
+              0,
+              null,
+              Map.of("listSubtype", subtype)));
     }
 
     int edgeIdx = 0;

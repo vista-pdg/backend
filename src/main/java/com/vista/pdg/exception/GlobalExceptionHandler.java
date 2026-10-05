@@ -37,6 +37,16 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(409).body(ApiError.of("ROLE_IN_USE", ex.getMessage()));
   }
 
+  @ExceptionHandler(InvalidAlgorithmInputException.class)
+  public ResponseEntity<ApiError> handleAlgorithmInput(InvalidAlgorithmInputException ex) {
+    ApiError body =
+        ex.field() == null
+            ? ApiError.of("INVALID_ALGORITHM_INPUT", ex.getMessage())
+            : ApiError.field(
+                "INVALID_ALGORITHM_INPUT", ex.getMessage(), Map.of(ex.field(), ex.getMessage()));
+    return ResponseEntity.badRequest().body(body);
+  }
+
   // ── Autenticación y registro ────────────────────────────────────────────
 
   /** Errores de Bean Validation: se devuelven por campo para que el formulario los sitúe. */

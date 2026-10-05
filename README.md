@@ -112,6 +112,71 @@ Escribir un evento nunca puede tumbar la petición que lo produjo: `TelemetrySer
 transacción propia (`REQUIRES_NEW`) **dentro** del `try`, de modo que un fallo al confirmar también
 queda atrapado y sólo llega al log.
 
+### Algoritmos de grafos
+
+`GET /api/algorithm/catalog` incluye seis operaciones con `type=graph`, `subtype=simple`
+e `input=structure`. `POST /api/algorithm/steps` recibe los nodos y aristas del lienzo;
+las posiciones y propiedades originales se conservan en cada instantánea.
+
+| Operación | Resultado | Condiciones |
+|---|---|---|
+| `bfs` | Recorrido en anchura | Desde `start`; respeta direcciones |
+| `dfs` | Recorrido en profundidad con pila | Desde `start`; respeta direcciones |
+| `dijkstra` | Distancias mínimas y predecesores | Desde `start`; pesos no negativos |
+| `floyd` | Matriz de distancias entre todos los pares | Sin origen; hasta 40 nodos; rechaza ciclos negativos |
+| `prim` | Árbol o bosque de expansión mínima y costo | No dirigido; comienza en `start` |
+| `kruskal` | Árbol o bosque de expansión mínima y costo | No dirigido; sin origen |
+
+Un peso ausente vale 1; cero es un peso válido. Dijkstra y Floyd usan `long` para las
+sumas y muestran `∞` cuando no existe camino. Prim y Kruskal aceptan pesos negativos
+y procesan todas las componentes, incluidos nodos aislados. Los empates conservan el
+orden de nodos/aristas recibido para reproducir el mismo rastro en 2D y 3D.
+
+Los cinco algoritmos nuevos incluyen pseudocódigo y variables sincronizadas. Floyd emite
+una matriz por nodo intermedio, en lugar de una instantánea por cada comparación de pares,
+para acotar el volumen del rastro. El resultado de Prim/Kruskal enumera las aristas elegidas
+y conserva el grafo completo en el lienzo.
+
+### Algoritmos básicos y ordenamiento
+
+El catálogo tiene **43 entradas** (33 nuevas para esta extensión). Cada estrategia es un bean
+independiente; el dispatcher conserva su registro genérico. Todas producen instantáneas,
+pseudocódigo y variables sincronizadas; los recorridos recursivos y merge/quick sort incluyen
+la pila de llamadas real. No requieren Gemini ni modifican datos persistidos.
+
+| Contexto | Operaciones |
+|---|---|
+| BST | Construir por inserción; inorden, preorden, postorden, niveles y búsqueda |
+| AVL | Inserción existente; inorden compartido con BST, preorden, postorden, niveles y búsqueda |
+| B-árbol | Niveles y búsqueda exhaustiva sobre el contrato actual de una clave por nodo |
+| Heap máximo | Heapify de abajo hacia arriba, insertar, extraer máximo y consultar máximo |
+| Pila / cola | Push y enqueue desde valores; pop/dequeue existentes; consultar tope/frente |
+| Lista enlazada | Recorrer, buscar, añadir al final, eliminar primera coincidencia e invertir |
+| Tabla hash | Buscar, insertar y eliminar primera coincidencia con encadenamiento separado |
+| Ordenamiento | Burbuja, selección, inserción, merge sort, quicksort y heapsort ascendentes |
+
+`AlgorithmDescriptor.parameter` indica `target` para búsqueda/eliminación o `value` para
+inserción individual; `maxValues` limita las demos por valores. La petición agrega `argument`
+(opcional): debe ser un entero de 32 bits, sin decimales, NaN ni infinito. Las entradas inválidas
+responden HTTP 400 `INVALID_ALGORITHM_INPUT`, con `fieldErrors` cuando el error corresponde a
+`argument` o `values`. Los constructores anteriores de los DTO siguen disponibles.
+
+Las demos aceptan hasta 64 valores; ordenamiento limita a **32** para acotar el rastro educativo,
+y mantiene IDs distintos aun con duplicados. Burbuja, inserción y merge son estables. Quicksort
+usa partición Lomuto (O(n²) en el peor caso); merge usa buffer auxiliar O(n); heapsort devuelve
+la secuencia ordenada y no un heap. Comparaciones, intercambios y escrituras son contadores reales.
+
+Operaciones sobre lienzo conservan IDs y no alteran las posiciones durante consultas. Las
+mutaciones reconstruyen los enlaces y aplican layouts existentes. Listas simples, dobles y
+circulares conservan `listSubtype`, necesario para distinguir listas pequeñas con enlaces
+idénticos; los índices no pueden contradecir sus enlaces. El heap valida árbol completo y orden
+máximo; los árboles binarios validan límites globales BST. Hash usa la misma función del generador:
+`abs(valor % buckets)`, con colisiones y duplicados permitidos.
+
+El B-árbol actual no representa nodos multiclave: estos recorridos no simulan inserciones con
+particiones ni afirman complejidad de búsqueda propia de un B-árbol multiclave. No se agregan
+representaciones Java descargables a estrategias que solamente tienen pseudocódigo.
+
 ### Generación por el asistente: de texto libre a contrato fijo
 
 El modelo no es determinista, así que la cadena que lo rodea sí lo es:
@@ -208,7 +273,7 @@ pisaba el 403.
 
 `.github/workflows/ci.yml`: Spotless → `verify` → E2E. El E2E es el flujo reutilizable
 `vista-pdg/dev-workflow/.github/workflows/e2e.yml`, que levanta este backend con el frontend de
-`main` y corre Cypress en Chromium y Firefox. Requiere el secreto de organización
+la rama pareja (mismo nombre) si existe, o `main`, y corre Cypress en Chromium y Firefox. Requiere el secreto de organización
 **`VISTA_REPO_TOKEN`** (PAT de solo lectura sobre `backend` y `frontend`).
 
 ## Despliegue
