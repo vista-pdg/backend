@@ -75,9 +75,10 @@ public class DataSeeder implements ApplicationRunner {
 
     ensureUser("admin@vista.com", "Administrador", "admin123", admin);
     ensureUser("docente@u.icesi.edu.co", "Docente Demo", "docente123", teacher);
-    User demoStudent =
-        ensureUser("estudiante@u.icesi.edu.co", "Estudiante Demo", "estudiante123", student);
-    if (demoStudent.getCourse() == null) {
+    // Only seed the initial enrollment. A later administrative removal must survive restarts.
+    if (userRepo.findByEmail("estudiante@u.icesi.edu.co").isEmpty()) {
+      User demoStudent =
+          ensureUser("estudiante@u.icesi.edu.co", "Estudiante Demo", "estudiante123", student);
       demoStudent.setCourse(cedi);
       userRepo.save(demoStudent);
       log.info("Seeder: estudiante demo vinculado a {}", cedi.getCode());

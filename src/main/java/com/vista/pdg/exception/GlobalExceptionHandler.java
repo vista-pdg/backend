@@ -40,6 +40,12 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
   }
 
+  @ExceptionHandler(com.vista.pdg.academic.service.CourseManagementException.class)
+  public ResponseEntity<ApiError> handleCourseManagement(
+      com.vista.pdg.academic.service.CourseManagementException ex) {
+    return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
+  }
+
   @ExceptionHandler(com.vista.pdg.auth.service.UserService.UserNotFoundException.class)
   public ResponseEntity<ApiError> handleUserNotFound(RuntimeException ex) {
     return ResponseEntity.status(404).body(ApiError.of("USER_NOT_FOUND", ex.getMessage()));
