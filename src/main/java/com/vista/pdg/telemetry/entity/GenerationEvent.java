@@ -18,6 +18,7 @@ import lombok.*;
     indexes = {
       @Index(name = "idx_genev_course", columnList = "courseCode"),
       @Index(name = "idx_genev_pseudonym", columnList = "pseudonym"),
+      @Index(name = "idx_genev_course_term_created", columnList = "courseCode,termCode,createdAt"),
       @Index(name = "idx_genev_created", columnList = "createdAt")
     })
 @Getter
@@ -41,6 +42,9 @@ public class GenerationEvent {
 
   @Column(length = 16)
   private String termCode;
+
+  /** Rol de estudiante al capturar; nulo en históricos cuyo rol no se puede acreditar. */
+  private Boolean studentParticipant;
 
   /**
    * HU-21: en el esquema v2 es el tipo <b>detallado</b> en español ({@code grafo_no_dirigido},
@@ -92,6 +96,13 @@ public class GenerationEvent {
 
   /** HU-21 · CA-2: pasos del rastro; en los eventos que reporta el cliente, los recorridos. */
   private Integer stepCount;
+
+  /** HU-06: correlación opaca asignada por el servidor; nunca aparece en el reporte docente. */
+  @Column(length = 36, unique = true)
+  private String executionId;
+
+  /** Mayor número de pasos recorridos reportado para la ejecución. Nulo en datos históricos. */
+  private Integer completedSteps;
 
   /**
    * HU-21 · CA-3: instrucción del estudiante, <b>sólo</b> cuando el resultado no fue éxito, para

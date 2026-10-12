@@ -29,6 +29,7 @@ class InteractionEventTest extends IntegrationTestSupport {
   @Autowired private GenerationEventRepository events;
   @Autowired private UserRepository users;
   @Autowired private Pseudonymizer pseudonymizer;
+  @Autowired private TelemetryService telemetry;
 
   private List<GenerationEvent> eventsOf(AuthResponse s) {
     Long id = users.findByEmail(s.email()).orElseThrow().getId();
@@ -246,16 +247,14 @@ class InteractionEventTest extends IntegrationTestSupport {
     AuthResponse s = registerStudent("analitica.reintento");
     for (int i = 0; i < 3; i++)
       generate(s.accessToken(), "grafo completo de 3 vertices, intento " + i);
-
-    String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
     String sessionId = eventsOf(s).getLast().getSessionId();
-    mockMvc
-        .perform(get("/api/analytics/retries").header("Authorization", "Bearer " + teacher))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[?(@.sessionId=='" + sessionId + "')].attempts").value(3))
-        .andExpect(
-            jsonPath("$[?(@.sessionId=='" + sessionId + "')].structureType")
-                .value("grafo_no_dirigido"));
+    assertThat(telemetry.retrySequences(3, java.time.Duration.ofSeconds(120)))
+        .anySatisfy(
+            sequence -> {
+              assertThat(sequence.sessionId()).isEqualTo(sessionId);
+              assertThat(sequence.attempts()).isEqualTo(3);
+              assertThat(sequence.structureType()).isEqualTo("grafo_no_dirigido");
+            });
   }
 
   @Test
@@ -265,19 +264,8 @@ class InteractionEventTest extends IntegrationTestSupport {
     generate(s.accessToken(), "grafo completo de 3 vertices");
     generate(s.accessToken(), "grafo completo de 3 vertices otra vez");
     String sessionId = eventsOf(s).getLast().getSessionId();
-    String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
-
-    mockMvc
-        .perform(get("/api/analytics/retries").header("Authorization", "Bearer " + teacher))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[?(@.sessionId=='" + sessionId + "')]").isEmpty());
-
-    // Con una ventana de cero segundos ni siquiera los rápidos cuentan.
-    mockMvc
-        .perform(
-            get("/api/analytics/retries?minAttempts=2&windowSeconds=0")
-                .header("Authorization", "Bearer " + teacher))
-        .andExpect(status().isOk());
+    assertThat(telemetry.retrySequences(3, java.time.Duration.ofSeconds(120)))
+        .noneSatisfy(sequence -> assertThat(sequence.sessionId()).isEqualTo(sessionId));
   }
 
   @Test
@@ -288,11 +276,10 @@ class InteractionEventTest extends IntegrationTestSupport {
         .perform(get("/api/analytics/retries").header("Authorization", "Bearer " + student))
         .andExpect(status().isForbidden());
     mockMvc.perform(get("/api/analytics/retries")).andExpect(status().isUnauthorized());
-
     String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
     mockMvc
         .perform(get("/api/analytics/retries").header("Authorization", "Bearer " + teacher))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isArray());
+        .andExpect(status().isGone())
+        .andExpect(jsonPath("$.code").value("ANALYTICS_ENDPOINT_RETIRED"));
   }
 }

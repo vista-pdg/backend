@@ -85,18 +85,13 @@ class AnalyticsAccessTest extends IntegrationTestSupport {
   }
 
   @Test
-  @DisplayName("CA-4: el docente recibe 200 con agregados")
+  @DisplayName("HU-06: el docente consulta sus cursos autorizados")
   void docenteRecibeAgregados() throws Exception {
     String token = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
     mockMvc
-        .perform(get(SUMMARY).header("Authorization", "Bearer " + token))
+        .perform(get("/api/analytics/courses").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.totalGenerations").isNumber())
-        .andExpect(jsonPath("$.distinctUsers").isNumber())
-        .andExpect(jsonPath("$.generationsByCourse").isMap())
-        .andExpect(jsonPath("$.generationsByStructureType").isMap())
-        .andExpect(jsonPath("$.totalAlgorithmRuns").isNumber())
-        .andExpect(jsonPath("$.eventsByVisualizationMode").isMap());
+        .andExpect(jsonPath("$").isArray());
   }
 
   /** El agregado no puede convertirse en una lista de personas por la puerta de atrás. */
@@ -107,21 +102,20 @@ class AnalyticsAccessTest extends IntegrationTestSupport {
     String body =
         mockMvc
             .perform(get(SUMMARY).header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
+            .andExpect(status().isGone())
             .andReturn()
             .getResponse()
             .getContentAsString();
-
-    assertThat(body).doesNotContain("@").doesNotContain("pseudonym").doesNotContain("email");
+    assertThat(body).doesNotContain("pseudonym", "email", "sessionId", "totalGenerations");
   }
 
   @Test
-  @DisplayName("CA-4: el administrador tampoco accede: la analítica es sólo del docente")
-  void adminRecibe403() throws Exception {
+  @DisplayName("HU-06: el administrador también accede a la analítica")
+  void adminAccedeAlListadoDeCursos() throws Exception {
     String token = login(ADMIN_EMAIL, ADMIN_PASSWORD).accessToken();
     mockMvc
-        .perform(get(SUMMARY).header("Authorization", "Bearer " + token))
-        .andExpect(status().isForbidden());
+        .perform(get("/api/analytics/courses").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
   }
 
   @Test

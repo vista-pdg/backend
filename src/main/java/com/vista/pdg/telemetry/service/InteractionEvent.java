@@ -20,7 +20,8 @@ public record InteractionEvent(
     Integer stepCount,
     String visualizationMode,
     String sessionId,
-    String promptText) {
+    String promptText,
+    String executionId) {
 
   /** De dónde salió la interacción. */
   public enum Source {
@@ -77,6 +78,7 @@ public record InteractionEvent(
     private String visualizationMode;
     private String sessionId;
     private String promptText;
+    private String executionId;
 
     private Builder(User user, String kind) {
       this.user = user;
@@ -138,6 +140,11 @@ public record InteractionEvent(
       return this;
     }
 
+    public Builder executionId(String value) {
+      this.executionId = value;
+      return this;
+    }
+
     public InteractionEvent build() {
       return new InteractionEvent(
           user,
@@ -151,7 +158,8 @@ public record InteractionEvent(
           stepCount,
           visualizationMode,
           sessionId,
-          promptText);
+          promptText,
+          executionId);
     }
   }
 }

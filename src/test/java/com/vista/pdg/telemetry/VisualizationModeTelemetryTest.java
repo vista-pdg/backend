@@ -1,12 +1,10 @@
 package com.vista.pdg.telemetry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.vista.pdg.auth.IntegrationTestSupport;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.repository.UserRepository;
@@ -42,6 +40,7 @@ class VisualizationModeTelemetryTest extends IntegrationTestSupport {
   @Autowired private GenerationEventRepository events;
   @Autowired private UserRepository users;
   @Autowired private Pseudonymizer pseudonymizer;
+  @Autowired private TelemetryService telemetry;
 
   private String pseudonymOf(AuthResponse session) {
     return pseudonymizer.pseudonymFor(users.findByEmail(session.email()).orElseThrow().getId());
@@ -163,26 +162,13 @@ class VisualizationModeTelemetryTest extends IntegrationTestSupport {
             authed(post(GENERATE), s.accessToken(), "{\"prompt\":\"grafo K3\"}")
                 .header(VisualizationMode.HEADER, "3D"))
         .andExpect(status().isOk());
-
-    String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
-    String body =
-        mockMvc
-            .perform(get(SUMMARY).header("Authorization", "Bearer " + teacher))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.eventsByVisualizationMode").isMap())
-            .andExpect(jsonPath("$.totalAlgorithmRuns").isNumber())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    JsonNode byMode = objectMapper.readTree(body).get("eventsByVisualizationMode");
-    assertThat(byMode.get("2D").asLong()).isGreaterThanOrEqualTo(1);
-    assertThat(byMode.get("3D").asLong()).isGreaterThanOrEqualTo(1);
-    assertThat(byMode.has("null")).as("los eventos sin modo no aparecen en el desglose").isFalse();
-
-    JsonNode root = objectMapper.readTree(body);
-    assertThat(root.get("totalAlgorithmRuns").asLong()).isGreaterThanOrEqualTo(1);
-    assertThat(root.get("totalGenerations").asLong()).isGreaterThanOrEqualTo(1);
+    // La captura sigue disponible internamente; HU-06 retira el resumen público sin supresión.
+    var summary = telemetry.summary();
+    assertThat(summary.eventsByVisualizationMode().get("2D")).isGreaterThanOrEqualTo(1);
+    assertThat(summary.eventsByVisualizationMode().get("3D")).isGreaterThanOrEqualTo(1);
+    assertThat(summary.eventsByVisualizationMode()).doesNotContainKey("null");
+    assertThat(summary.totalAlgorithmRuns()).isGreaterThanOrEqualTo(1);
+    assertThat(summary.totalGenerations()).isGreaterThanOrEqualTo(1);
   }
 
   @Test

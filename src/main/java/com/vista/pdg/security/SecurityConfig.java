@@ -49,9 +49,9 @@ public class SecurityConfig {
                     // El selector de curso del registro se consulta antes de que exista sesión.
                     .requestMatchers(HttpMethod.GET, "/api/courses")
                     .permitAll()
-                    // HU-16 CA-4: sólo el docente ve agregados; el estudiante recibe 403.
+                    // HU-06: docentes por asignación y administradores; el estudiante recibe 403.
                     .requestMatchers("/api/analytics/**")
-                    .hasRole("TEACHER")
+                    .hasAnyRole("TEACHER", "ADMIN")
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                     // HU-16 CA-3: el asistente ya no es anónimo. Cae en

@@ -22,6 +22,24 @@ public class GlobalExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+  @ExceptionHandler(
+      org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ApiError> handleParameterType(
+      org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+    return ResponseEntity.badRequest()
+        .body(
+            ApiError.field(
+                "INVALID_PARAMETER",
+                "Revisa los parámetros de la petición",
+                Map.of(ex.getName(), "El valor no tiene el formato esperado")));
+  }
+
+  @ExceptionHandler(com.vista.pdg.telemetry.service.AnalyticsRequestException.class)
+  public ResponseEntity<ApiError> handleAnalytics(
+      com.vista.pdg.telemetry.service.AnalyticsRequestException ex) {
+    return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
+  }
+
   @ExceptionHandler(com.vista.pdg.auth.service.UserService.UserNotFoundException.class)
   public ResponseEntity<ApiError> handleUserNotFound(RuntimeException ex) {
     return ResponseEntity.status(404).body(ApiError.of("USER_NOT_FOUND", ex.getMessage()));

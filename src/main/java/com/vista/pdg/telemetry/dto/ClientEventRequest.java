@@ -16,7 +16,8 @@ public record ClientEventRequest(
     String subtype,
     String algorithm,
     Integer stepCount,
-    Integer nodeCount) {
+    Integer nodeCount,
+    String executionId) {
 
   public static final String ALGORITHM_COMPLETED = "algorithm_completed";
 }

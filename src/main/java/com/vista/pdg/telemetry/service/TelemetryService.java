@@ -72,6 +72,9 @@ public class TelemetryService {
                       .courseCode(user.getCourse() != null ? user.getCourse().getCode() : null)
                       .termCode(
                           user.getCourse() != null ? user.getCourse().getTerm().getCode() : null)
+                      .studentParticipant(
+                          user.getAuthorities().stream()
+                              .anyMatch(a -> "ROLE_STUDENT".equals(a.getAuthority())))
                       .visualizationMode(VisualizationMode.normalize(event.visualizationMode()))
                       .kind(event.kind())
                       .structureType(event.structureKind())
@@ -81,6 +84,8 @@ public class TelemetryService {
                       .outcome(event.outcome() == null ? null : event.outcome().value())
                       .sessionId(event.sessionId())
                       .stepCount(event.stepCount())
+                      .executionId(event.executionId())
+                      .completedSteps(event.executionId() == null ? null : 0)
                       .promptText(promptToKeep(event))
                       .nodeCount(event.nodeCount())
                       .schemaVersion(2)
@@ -133,7 +138,7 @@ public class TelemetryService {
   }
 
   /** HU-18 · CA-7 y HU-21 · CA-2: una ejecución paso a paso, con su algoritmo y sus pasos. */
-  public void recordAlgorithm(
+  public String recordAlgorithm(
       User user,
       String type,
       String subtype,
@@ -142,8 +147,10 @@ public class TelemetryService {
       Integer stepCount,
       String visualizationMode,
       String sessionId) {
+    String executionId = java.util.UUID.randomUUID().toString();
     record(
         InteractionEvent.of(user, KIND_ALGORITHM)
+            .executionId(executionId)
             .structureKind(StructureKind.of(type, subtype))
             .subtype(subtype)
             .algorithm(algorithm)
@@ -154,6 +161,23 @@ public class TelemetryService {
             .visualizationMode(visualizationMode)
             .sessionId(sessionId)
             .build());
+    return executionId;
+  }
+
+  /** Actualización monotónica y autenticada; repeticiones y replays no suman pasos. */
+  public void recordProgress(User user, String executionId, Integer steps) {
+    if (executionId == null
+        || !executionId.matches("[0-9a-fA-F-]{36}")
+        || steps == null
+        || steps < 0) return;
+    try {
+      transaction.executeWithoutResult(
+          status ->
+              repository.advanceExecution(
+                  pseudonymizer.pseudonymFor(user.getId()), executionId, steps));
+    } catch (RuntimeException e) {
+      log.error("No se pudo registrar el progreso de algoritmo", e);
+    }
   }
 
   /**

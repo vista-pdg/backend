@@ -5,17 +5,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.vista.pdg.auth.IntegrationTestSupport;
 import com.vista.pdg.auth.dto.AuthResponse;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.auth.repository.UserRepository;
-import com.vista.pdg.telemetry.dto.EventView;
-import com.vista.pdg.telemetry.dto.RetrySequence;
 import com.vista.pdg.telemetry.entity.GenerationEvent;
 import com.vista.pdg.telemetry.repository.GenerationEventRepository;
 import com.vista.pdg.telemetry.service.Pseudonymizer;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +35,7 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
   @Autowired private GenerationEventRepository events;
   @Autowired private UserRepository users;
   @Autowired private Pseudonymizer pseudonymizer;
+  @Autowired private com.vista.pdg.telemetry.service.TelemetryService telemetry;
 
   private String studentToken() throws Exception {
     return login(STUDENT_EMAIL, STUDENT_PASSWORD).accessToken();
@@ -211,25 +208,17 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
   @Test
   @DisplayName("CA-3: el docente ve los prompts fallidos y la vista no expone seudónimos")
   void elDocenteRevisaLosFallidos() throws Exception {
-    generate(studentToken(), "un grafo hiperbólico fuera de alcance", 503);
     String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
-
     String body =
         mockMvc
             .perform(
                 get("/api/analytics/events?outcome=fuera_de_alcance&limit=20")
                     .header("Authorization", "Bearer " + teacher))
-            .andExpect(status().isOk())
+            .andExpect(status().isGone())
             .andReturn()
             .getResponse()
             .getContentAsString();
-
-    List<EventView> vistos = objectMapper.readValue(body, new TypeReference<>() {});
-    assertThat(vistos)
-        .isNotEmpty()
-        .allSatisfy(v -> assertThat(v.outcome()).isEqualTo("fuera_de_alcance"));
-    assertThat(vistos.getFirst().promptText()).contains("hiperbólico");
-    assertThat(body).doesNotContain("pseudonym").doesNotContain("seudonimo");
+    assertThat(body).doesNotContain("promptText", "sessionId", "pseudonym");
   }
 
   @Test
@@ -249,28 +238,12 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
     generate(token, "haz un árbol raro fuera de alcance", 503);
     generate(token, "bueno, un árbol rojinegro fuera de alcance", 503);
     generate(token, "un árbol rojo-negro entonces, fuera de alcance", 503);
-
-    String sesion = minesOf(STUDENT_EMAIL).getLast().getSessionId();
-    String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
-
-    String body =
-        mockMvc
-            .perform(
-                get("/api/analytics/retries?minAttempts=3&windowSeconds=120")
-                    .header("Authorization", "Bearer " + teacher))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    List<RetrySequence> secuencias = objectMapper.readValue(body, new TypeReference<>() {});
-    assertThat(secuencias)
-        .as("la sesión con tres intentos seguidos aparece como reintento")
+    String session = minesOf(STUDENT_EMAIL).getLast().getSessionId();
+    assertThat(telemetry.retrySequences(3, java.time.Duration.ofSeconds(120)))
         .anySatisfy(
-            s -> {
-              assertThat(s.sessionId()).isEqualTo(sesion);
-              assertThat(s.attempts()).isGreaterThanOrEqualTo(3);
-              assertThat(Instant.parse(s.lastAt())).isAfterOrEqualTo(Instant.parse(s.firstAt()));
+            sequence -> {
+              assertThat(sequence.sessionId()).isEqualTo(session);
+              assertThat(sequence.attempts()).isGreaterThanOrEqualTo(3);
             });
   }
 
@@ -280,21 +253,9 @@ class AnalyticsInteractionTest extends IntegrationTestSupport {
     String email = uniqueEmail("solo-intento");
     AuthResponse solitario = registerAs(email);
     generate(solitario.accessToken(), "crea un grafo no dirigido con 3 nodos", 200);
-    String sesion = minesOf(email).getLast().getSessionId();
-
-    String teacher = login(TEACHER_EMAIL, TEACHER_PASSWORD).accessToken();
-    String body =
-        mockMvc
-            .perform(get("/api/analytics/retries").header("Authorization", "Bearer " + teacher))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    List<RetrySequence> secuencias = objectMapper.readValue(body, new TypeReference<>() {});
-    assertThat(secuencias)
-        .as("quien generó una sola vez no aparece como reintento")
-        .noneSatisfy(s -> assertThat(s.sessionId()).isEqualTo(sesion));
+    String session = minesOf(email).getLast().getSessionId();
+    assertThat(telemetry.retrySequences(3, java.time.Duration.ofSeconds(120)))
+        .noneSatisfy(sequence -> assertThat(sequence.sessionId()).isEqualTo(session));
   }
 
   // ── CA-5 · Seudonimización en origen ─────────────────────────────────────

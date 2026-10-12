@@ -9,6 +9,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface GenerationEventRepository extends JpaRepository<GenerationEvent, Long> {
 
+  @org.springframework.data.jpa.repository.Modifying
+  @Query(
+      "update GenerationEvent e set e.completedSteps = :steps where e.executionId = :executionId "
+          + "and e.pseudonym = :pseudonym and e.kind = 'algorithm' "
+          + "and e.completedSteps < :steps and e.stepCount >= :steps")
+  int advanceExecution(
+      @Param("pseudonym") String pseudonym,
+      @Param("executionId") String executionId,
+      @Param("steps") int steps);
+
   List<GenerationEvent> findByPseudonym(String pseudonym);
 
   /** Las filas anteriores a la HU-18 no tienen {@code kind}: eran todas generaciones. */
