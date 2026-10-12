@@ -39,6 +39,7 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 | `AUTH_ALLOWED_EMAIL_DOMAINS` | `u.icesi.edu.co,icesi.edu.co` | vacío = cualquier dominio |
 | `AUTH_MIN_PASSWORD_LENGTH` | `8` | |
 | `TELEMETRY_PSEUDONYM_SECRET` | valor de desarrollo | **cámbialo en despliegue**; independiente de `JWT_SECRET` a propósito |
+| `ANALYTICS_RETRY_THRESHOLD` | `0.30` | proporción (0–1) de sesiones con reintentos por encima de la que se destaca un tema; el mínimo de privacidad permanece en 5 |
 | `ASSISTANT_DAILY_QUOTA` | `40` | cuota diaria por estudiante para cursos sin cuota propia |
 | `ASSISTANT_WARNING_RATIO` | `0.2` | aviso preventivo cuando restan ≤ ⌈límite·ratio⌉ mensajes |
 | `ASSISTANT_RATE_PER_MINUTE` | `5` | ráfaga máxima por usuario en una ventana deslizante de 60 s |
@@ -52,7 +53,7 @@ Usuarios sembrados: `admin@vista.com` / `admin123` (ADMIN), `docente@u.icesi.edu
 ```
 auth/        registro, login, par de tokens con detección de reuso, roles STUDENT/TEACHER/ADMIN
 academic/    periodos académicos y cursos; GET /api/courses (público)
-telemetry/   registro analítico seudonimizado; /api/analytics/** (solo TEACHER) y la escritura del cliente
+telemetry/   registro seudonimizado y reporte agregado; TEACHER por curso asignado, ADMIN por todos los cursos
 security/    JwtAuthFilter, 401 sin autenticación / 403 con rol insuficiente
 assistant/   cuota diaria por estudiante, límite de tasa, cuota por curso (ADMIN) con auditoría
   session/   memoria conversacional en Redis: contrato vigente + últimos turnos, con TTL
@@ -100,13 +101,18 @@ nodeCount}`. Llegar al último paso es un hecho que sólo el navegador conoce. E
 seudónimo, curso, sesión y hora: **el cliente no puede escribir identidad ni falsear la cohorte**, y
 la respuesta es siempre 202 para que la telemetría no rompa nada.
 
-**Consulta del docente** (`TEACHER`): `GET /api/analytics/summary` (agregados), `GET
-/api/analytics/events?outcome=&limit=` (los últimos eventos, con el prompt de los que no salieron
-bien y **sin seudónimo**: se revisa qué se pidió, no quién) y `GET
-/api/analytics/retries?minAttempts=3&windowSeconds=120` (secuencias de reintento). Los reintentos no
-se marcan al escribir —cuando ocurre el primer intento nadie sabe aún que habrá un tercero— sino que
-se detectan al consultar agrupando por sesión y tipo de estructura, así el umbral se cambia sin
-migrar datos.
+**Consulta agregada (HU-06):** `GET /api/analytics/courses` lista los cursos autorizados.
+`GET /api/analytics/report?courseCode=CEDI-G1&from=2026-04-01&to=2026-04-30` y su variante
+`/report.csv` aplican filtros, permisos y supresión de segmentos con menos de cinco estudiantes.
+Los antiguos `/summary`, `/events` y `/retries` responden **410**: no se publican sesiones,
+prompts ni agregados globales que permitan eludir la protección. Véanse
+[contratos, asignación docente–curso y semántica de métricas](docs/pedagogical-analytics.md).
+
+Las nuevas ejecuciones devuelven `X-Analytics-Execution`; el navegador reporta el avance con
+`{event: "algorithm_progress", executionId, stepCount}`. Se actualiza de forma monotónica la
+ejecución original, validando su propietario y el máximo de pasos. Los clientes anteriores
+pueden seguir enviando el evento de finalización de HU-21; esos eventos sin correlación no se
+interpretan como progreso medido en el reporte.
 
 Escribir un evento nunca puede tumbar la petición que lo produjo: `TelemetryService.record` abre una
 transacción propia (`REQUIRES_NEW`) **dentro** del `try`, de modo que un fallo al confirmar también

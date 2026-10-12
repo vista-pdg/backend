@@ -43,21 +43,25 @@ public class AlgorithmController {
       @RequestHeader(value = VisualizationMode.HEADER, required = false) String mode,
       @AuthenticationPrincipal User user) {
     StepsResponse response = dispatcher.run(req);
+    String executionId = null;
     // HU-18 · CA-7: la ejecución se registra con el modo de visualización del cliente, y sólo si
     // produjo un rastro; una petición rechazada no es una ejecución.
     if (!response.error()) {
       // HU-21 · CA-2: qué algoritmo, sobre qué tipo de estructura y con cuántos pasos.
-      telemetryService.recordAlgorithm(
-          user,
-          req.type(),
-          req.subtype(),
-          req.operation(),
-          finalNodeCount(response.steps()),
-          response.steps() == null ? null : response.steps().size(),
-          mode,
-          sessionService.ensureSessionId(user.getId()));
+      executionId =
+          telemetryService.recordAlgorithm(
+              user,
+              req.type(),
+              req.subtype(),
+              req.operation(),
+              finalNodeCount(response.steps()),
+              response.steps() == null ? null : response.steps().size(),
+              mode,
+              sessionService.ensureSessionId(user.getId()));
     }
-    return ResponseEntity.ok(response);
+    return executionId == null
+        ? ResponseEntity.ok(response)
+        : ResponseEntity.ok().header("X-Analytics-Execution", executionId).body(response);
   }
 
   private static int finalNodeCount(List<AlgorithmStep> steps) {

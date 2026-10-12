@@ -37,6 +37,12 @@ public class AnalyticsEventController {
       @RequestBody ClientEventRequest req,
       @RequestHeader(value = VisualizationMode.HEADER, required = false) String mode,
       @AuthenticationPrincipal User user) {
+    if (("algorithm_progress".equals(req.event())
+            || ClientEventRequest.ALGORITHM_COMPLETED.equals(req.event()))
+        && req.executionId() != null) {
+      telemetryService.recordProgress(user, req.executionId(), req.stepCount());
+      return ResponseEntity.accepted().build();
+    }
     if (!ClientEventRequest.ALGORITHM_COMPLETED.equals(req.event())) {
       // Un evento que no reconocemos no es un error del estudiante: se ignora y se sigue.
       return ResponseEntity.accepted().build();

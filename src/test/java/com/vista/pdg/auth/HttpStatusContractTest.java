@@ -165,7 +165,7 @@ class HttpStatusContractTest {
     String student = accessTokenOf("estudiante@u.icesi.edu.co", "estudiante123");
     String teacher = accessTokenOf("docente@u.icesi.edu.co", "docente123");
     assertThat(statusOf("GET", "/api/analytics/summary", student, null)).isEqualTo(403);
-    assertThat(statusOf("GET", "/api/analytics/summary", teacher, null)).isEqualTo(200);
+    assertThat(statusOf("GET", "/api/analytics/summary", teacher, null)).isEqualTo(410);
     assertThat(statusOf("GET", "/api/analytics/summary", null, null)).isEqualTo(401);
   }
 
