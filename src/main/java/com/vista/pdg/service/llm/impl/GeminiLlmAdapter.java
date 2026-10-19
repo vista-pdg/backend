@@ -77,7 +77,7 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
       String reason = unavailableReason(e);
       if (reason != null) {
         log.error("Gemini unavailable — model: {}, reason: {}", model, e.getMessage());
-        throw new LlmUnavailableException(reason, e);
+        throw new LlmUnavailableException(reason, e, reason.contains("(503)"));
       }
       log.error("Gemini call failed — model: {}, error: {}", model, e.getMessage(), e);
       throw e;

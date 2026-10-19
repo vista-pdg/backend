@@ -32,12 +32,15 @@ public class BstInsertAlgorithm implements AlgorithmStrategy {
   }
 
   public StepsResponse generate(AlgorithmRequest r) {
-    List<Integer> values = CanvasTrace.values(r, 64), inserted = new ArrayList<>();
+    CanvasTreeInput canvas = CanvasSequenceInput.present(r) ? new CanvasTreeInput(r, false) : null;
+    List<Integer> values =
+        canvas == null ? CanvasTrace.values(r, 64) : List.of(CanvasTrace.argument(r));
+    List<Integer> inserted = canvas == null ? new ArrayList<>() : canvas.preorder();
     List<AlgorithmStep> steps = new ArrayList<>();
     List<String> code =
         List.of(
             "construir_bst(valores):",
-            "  raíz ← nulo",
+            "  raíz ← árbol inicial (o nulo)",
             "  para cada valor:",
             "    comparar y seguir la rama menor o mayor",
             "    si no existe: insertar una hoja",
@@ -45,15 +48,17 @@ public class BstInsertAlgorithm implements AlgorithmStrategy {
     steps.add(
         new AlgorithmStep(
             0,
-            "BST vacío",
-            "Se construye un BST nuevo con los valores dados.",
+            canvas == null ? "BST vacío" : "BST del lienzo",
+            canvas == null
+                ? "Se construye un BST nuevo con los valores dados."
+                : "Se inserta sobre tu árbol actual.",
             "initial",
             List.of(),
             null,
-            List.of(),
-            List.of(),
+            canvas == null ? List.of() : canvas.trace.nodes,
+            canvas == null ? List.of() : canvas.trace.edges,
             2,
-            Map.of("insertados", "[]"),
+            Map.of("insertados", inserted.toString()),
             List.of()));
     for (int v : values) {
       GeneratedStructure before = build(inserted);
@@ -124,7 +129,8 @@ public class BstInsertAlgorithm implements AlgorithmStrategy {
             6,
             Map.of("insertados", inserted.toString()),
             List.of()));
-    return StepsResponse.ok(List.copyOf(steps), code, "pseudocode");
+    var response = StepsResponse.ok(List.copyOf(steps), code, "pseudocode");
+    return canvas == null ? response : canvas.restore(response);
   }
 
   private GeneratedStructure build(List<Integer> values) {

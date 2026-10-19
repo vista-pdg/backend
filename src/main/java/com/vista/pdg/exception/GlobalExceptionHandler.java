@@ -182,7 +182,8 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Créditos, cuota o clave del proveedor: 503 con el motivo, sin reintentos ni detalle interno.
+   * Errores del proveedor: 503 con motivo seguro. Las sobrecargas temporales llegan aquí tras
+   * agotar los reintentos; cuota o clave inválida se rechazan inmediatamente.
    */
   @ExceptionHandler(LlmUnavailableException.class)
   public ResponseEntity<StructureResponse> handleLlmUnavailable(LlmUnavailableException ex) {

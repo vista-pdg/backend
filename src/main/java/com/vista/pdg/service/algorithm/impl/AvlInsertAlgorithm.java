@@ -34,6 +34,14 @@ public class AvlInsertAlgorithm implements AlgorithmStrategy {
 
   @Override
   public StepsResponse generate(AlgorithmRequest request) {
+    if (CanvasSequenceInput.present(request)) {
+      CanvasTreeInput input = new CanvasTreeInput(request, true);
+      return input
+          .restore(
+              avl.generateAvlInsertSteps(
+                  java.util.List.of(CanvasTrace.argument(request)), input.nodesWithParents()))
+          .withJava(AlgorithmCode.avlOnCanvas());
+    }
     return avl.generateAvlInsertSteps(request.values()).withJava(AlgorithmCode.avl());
   }
 }

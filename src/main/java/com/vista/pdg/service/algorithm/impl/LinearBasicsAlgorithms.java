@@ -33,25 +33,49 @@ public final class LinearBasicsAlgorithms {
     }
 
     public StepsResponse generate(AlgorithmRequest r) {
-      var all = SequenceScene.fromValues(CanvasTrace.values(r, 64));
-      CanvasTrace t = new CanvasTrace(all, List.of());
-      List<Node3D> prefix = new ArrayList<>();
+      boolean canvas = CanvasSequenceInput.present(r);
+      List<Node3D> all;
+      CanvasTrace t;
+      List<Node3D> prefix;
+      if (canvas) {
+        t = new CanvasTrace(r);
+        prefix = CanvasSequenceInput.read(t, kind);
+        if (prefix.size() >= 64)
+          throw new InvalidAlgorithmInputException("La estructura admite hasta 64 nodos.");
+        all =
+            List.of(
+                new Node3D(
+                    SequenceScene.freshId(prefix),
+                    "" + CanvasTrace.argument(r),
+                    0,
+                    0,
+                    0,
+                    0,
+                    null,
+                    Map.of()));
+      } else {
+        all = SequenceScene.fromValues(CanvasTrace.values(r, 64));
+        t = new CanvasTrace(all, List.of());
+        prefix = new ArrayList<>();
+      }
       var code =
           List.of(
               "construir(valores):",
-              "  estructura ← vacía",
+              "  estructura ← lienzo o vacía",
               "  para cada valor:",
               "    añadir al " + (kind.equals("stack") ? "tope" : "final"),
               "  retornar estructura");
       t.add(
-          List.of(),
-          List.of(),
-          "Estructura vacía",
-          "Se construye una demostración nueva.",
+          canvas ? t.nodes : List.of(),
+          canvas ? t.edges : List.of(),
+          canvas ? "Estructura del lienzo" : "Estructura vacía",
+          canvas
+              ? "Se añade el valor a tu estructura actual."
+              : "Se construye una demostración nueva.",
           "initial",
           2,
           List.of(),
-          Map.of("tamaño", "0"));
+          Map.of("tamaño", "" + prefix.size()));
       for (Node3D n : all) {
         prefix.add(n);
         var s = SequenceScene.place(prefix, kind, false, false);
