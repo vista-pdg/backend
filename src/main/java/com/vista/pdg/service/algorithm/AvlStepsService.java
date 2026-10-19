@@ -16,7 +16,7 @@ public class AvlStepsService {
   public static final List<String> CODE =
       List.of(
           "insertarAVL(valores):",
-          "  raíz ← nulo",
+          "  raíz ← árbol inicial (o nulo)",
           "  para cada valor: insertar según la regla BST",
           "    comprobar factores de balance en el camino",
           "    rotarIzquierda(pivote) si corresponde",
@@ -32,23 +32,34 @@ public class AvlStepsService {
   // ── Public API ────────────────────────────────────────────────────────────
 
   public StepsResponse generateAvlInsertSteps(List<Integer> values) {
+    return generateAvlInsertSteps(values, List.of());
+  }
+
+  /** Initial nodes have already passed topology, BST and AVL validation. */
+  public StepsResponse generateAvlInsertSteps(List<Integer> values, List<Node3D> initial) {
     if (values == null || values.isEmpty()) {
       return StepsResponse.error("Se requiere al menos un valor para la demostración");
     }
 
     List<AlgorithmStep> steps = new ArrayList<>();
     int[] idx = {0};
-    AvlNode root = null;
+    AvlNode root =
+        initial.isEmpty()
+            ? null
+            : importTree(
+                initial.stream().filter(n -> n.parent() == null).findFirst().orElseThrow(),
+                initial);
+    updateAllHeights(root);
 
     steps.add(
         makeStep(
             idx[0]++,
-            "Árbol AVL vacío",
+            root == null ? "Árbol AVL vacío" : "Árbol AVL del lienzo",
             "Estado inicial. Se insertarán los valores: " + values,
             "initial",
             List.of(),
             null,
-            null,
+            root,
             2));
 
     for (int v : values) {
@@ -137,6 +148,17 @@ public class AvlStepsService {
     }
 
     return StepsResponse.ok(steps, CODE, "pseudocode");
+  }
+
+  private AvlNode importTree(Node3D node, List<Node3D> initial) {
+    AvlNode result = new AvlNode(Integer.parseInt(node.label()));
+    for (Node3D child : initial)
+      if (node.id().equals(child.parent())) {
+        if (Integer.parseInt(child.label()) < result.value)
+          result.left = importTree(child, initial);
+        else result.right = importTree(child, initial);
+      }
+    return result;
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────

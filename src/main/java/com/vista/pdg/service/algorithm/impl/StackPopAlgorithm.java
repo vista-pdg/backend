@@ -57,6 +57,7 @@ public class StackPopAlgorithm implements AlgorithmStrategy {
 
   @Override
   public StepsResponse generate(AlgorithmRequest req) {
+    if (CanvasSequenceInput.present(req)) return CanvasSequenceInput.remove(req, "stack");
     if (req.values() == null || req.values().isEmpty()) {
       return StepsResponse.error("Se requiere al menos un valor en la pila");
     }

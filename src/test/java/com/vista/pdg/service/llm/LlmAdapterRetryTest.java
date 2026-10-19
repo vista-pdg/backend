@@ -46,10 +46,16 @@ class LlmAdapterRetryTest {
   private static final class ScriptedAdapter extends AbstractLlmAdapter {
     final Iterator<Object> script;
     final List<String> prompts = new ArrayList<>();
+    final List<Integer> waits = new ArrayList<>();
 
     ScriptedAdapter(Object... responses) {
       super(builder());
       this.script = List.of(responses).iterator();
+    }
+
+    @Override
+    protected void sleepBackoff(int attempt) {
+      waits.add(attempt);
     }
 
     @Override
@@ -115,6 +121,41 @@ class LlmAdapterRetryTest {
         .isInstanceOf(LlmUnavailableException.class)
         .hasMessage("sin créditos");
     assertThat(a.prompts).hasSize(1);
+  }
+
+  @Test
+  void temporaryOverloadRetriesWithoutChangingPromptOrConversation() {
+    var failure = new LlmUnavailableException("Temporal (503)", null, true);
+    ScriptedAdapter a =
+        new ScriptedAdapter(failure, failure, "{\"type\":\"stack\",\"values\":[1,2]}");
+    var context =
+        new com.vista.pdg.service.llm.def.ConversationContext(
+            "{\"type\":\"stack\"}", List.of("usuario: crea una pila"));
+    assertThat(a.generate("añade 2", context).type()).isEqualTo("stack");
+    assertThat(a.prompts).hasSize(3).allMatch(prompt -> prompt.equals(a.prompts.getFirst()));
+    assertThat(a.prompts.getFirst())
+        .contains("CURRENT STRUCTURE", "añade 2")
+        .doesNotContain("previous response failed");
+    assertThat(a.waits).containsExactly(1, 2);
+  }
+
+  @Test
+  void persistentOverloadStopsAfterThreeAttemptsWithSafeProviderError() {
+    var failure = new LlmUnavailableException("Temporal (503)", null, true);
+    ScriptedAdapter a = new ScriptedAdapter(failure, failure, failure);
+    assertThatThrownBy(() -> a.generate("pila")).isSameAs(failure);
+    assertThat(a.prompts).hasSize(3);
+    assertThat(a.waits).containsExactly(1, 2);
+  }
+
+  @Test
+  void invalidJsonAndOverloadShareTheSameAttemptBudget() {
+    var failure = new LlmUnavailableException("Temporal (503)", null, true);
+    ScriptedAdapter a = new ScriptedAdapter("not json", failure, failure);
+    assertThatThrownBy(() -> a.generate("pila")).isSameAs(failure);
+    assertThat(a.prompts).hasSize(3);
+    assertThat(a.prompts.get(2)).isEqualTo(a.prompts.get(1));
+    assertThat(a.waits).containsExactly(1, 2);
   }
 
   @Test

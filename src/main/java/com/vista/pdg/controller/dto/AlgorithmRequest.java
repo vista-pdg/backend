@@ -6,9 +6,9 @@ import com.vista.pdg.model.generated.Node3D;
 import java.util.List;
 
 /**
- * Petición de pasos. {@code values} alimenta los algoritmos que construyen su estructura (AVL,
- * pila, cola); {@code nodes}/{@code edges}/{@code start} (HU-19) alimentan los que recorren la
- * estructura que el estudiante ya tiene en el lienzo (BFS).
+ * Petición de pasos. {@code values} crea una demostración nueva. {@code nodes}/{@code edges}
+ * ejecutan sobre la estructura del lienzo, también en algoritmos que admiten valores. {@code
+ * argument} es el valor a insertar o buscar y {@code start} el nodo inicial del recorrido.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AlgorithmRequest(

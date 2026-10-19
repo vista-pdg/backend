@@ -1,13 +1,19 @@
 package com.vista.pdg.exception;
 
-/**
- * El proveedor del modelo no puede atender la petición por una causa ajena al contenido: créditos
- * agotados, cuota excedida, clave inválida o servicio caído. Reintentar con el mismo prompt no la
- * arregla, así que el adaptador la lanza sin agotar los intentos y el cliente recibe un 503 con un
- * mensaje que dice qué revisar.
- */
+/** Provider failure independent of prompt content; only transient overloads are retryable. */
 public class LlmUnavailableException extends RuntimeException {
+  private final boolean retryable;
+
   public LlmUnavailableException(String message, Throwable cause) {
+    this(message, cause, false);
+  }
+
+  public LlmUnavailableException(String message, Throwable cause, boolean retryable) {
     super(message, cause);
+    this.retryable = retryable;
+  }
+
+  public boolean isRetryable() {
+    return retryable;
   }
 }

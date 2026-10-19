@@ -84,6 +84,29 @@ public final class AlgorithmCode {
         false);
   }
 
+  /** Same line mapping, with the existing root supplied by the caller. */
+  public static CodeRepresentation avlOnCanvas() {
+    var base = avl();
+    var code =
+        base.code().stream()
+            .map(
+                line ->
+                    line.replace(
+                            "insertarTodos(int[] valores)",
+                            "insertarTodos(Nodo raiz, int[] valores)")
+                        .replace(
+                            "Nodo raiz = null;", "// Se conserva la raíz recibida del lienzo."))
+            .toList();
+    return new CodeRepresentation(
+        base.language(),
+        base.label(),
+        base.fileName(),
+        code,
+        base.lineMap(),
+        base.sourceLabel(),
+        base.sourceUrl());
+  }
+
   private static CodeRepresentation listing(
       String fileName, Map<Integer, String> anchors, boolean guide) {
     try {

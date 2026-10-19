@@ -61,8 +61,12 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
       } catch (UnsupportedStructureException e) {
         throw e;
       } catch (LlmUnavailableException e) {
-        // Créditos, cuota o clave: el mismo prompt no va a funcionar en un segundo intento.
-        throw e;
+        // Keep the same prompt and context: an overloaded provider did not return invalid JSON.
+        // All failure types share the same three-attempt budget.
+        if (!e.isRetryable() || attempt == MAX_ATTEMPTS) throw e;
+        log.warn(
+            "LLM temporarily unavailable; retrying attempt {} of {}", attempt + 1, MAX_ATTEMPTS);
+        sleepBackoff(attempt);
       } catch (InvalidContractException e) {
         failures.add(new AttemptDetail(attempt, e.getMessage()));
         if (attempt < MAX_ATTEMPTS) {
@@ -120,7 +124,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
     return s;
   }
 
-  private void sleepBackoff(int attempt) {
+  protected void sleepBackoff(int attempt) {
     try {
       Thread.sleep(attempt * 1000L);
     } catch (InterruptedException ie) {

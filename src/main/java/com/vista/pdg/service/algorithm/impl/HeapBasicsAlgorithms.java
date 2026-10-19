@@ -40,7 +40,7 @@ public final class HeapBasicsAlgorithms {
     public StepsResponse generate(AlgorithmRequest r) {
       List<Node3D> heap;
       CanvasTrace t;
-      if (operation.equals("heapify")) {
+      if (operation.equals("heapify") && !CanvasSequenceInput.present(r)) {
         heap = SequenceScene.fromValues(CanvasTrace.values(r, 64));
         var scene = SequenceScene.place(heap, "heap", false, false);
         t = new CanvasTrace(scene.nodes(), scene.edges());
@@ -60,7 +60,7 @@ public final class HeapBasicsAlgorithms {
           heap.add(t.byId.get(id));
           q.addAll(kids);
         }
-        for (int i = 1; i < heap.size(); i++)
+        for (int i = 1; !operation.equals("heapify") && i < heap.size(); i++)
           if (CanvasTrace.value(heap.get((i - 1) / 2)) < CanvasTrace.value(heap.get(i)))
             throw new InvalidAlgorithmInputException(
                 "Se requiere un heap máximo; usa Heapify para construirlo.");
