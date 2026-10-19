@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.6</version>
+		<version>4.0.8</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.vista</groupId>
@@ -29,6 +29,10 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Security patches within Boot 4.0's existing Tomcat/Jackson lines. Remove when its BOM catches up. -->
+		<tomcat.version>11.0.27</tomcat.version>
+		<jackson-2-bom.version>2.21.8</jackson-2-bom.version>
+		<jackson-bom.version>3.1.8</jackson-bom.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -48,7 +52,7 @@
 		<dependency>
 			<groupId>com.google.genai</groupId>
 			<artifactId>google-genai</artifactId>
-			<version>1.5.0</version>
+			<version>1.78.0</version>
 		</dependency>
 
 		<dependency>
