@@ -53,7 +53,8 @@ jobs:
   e2e:
     name: E2E (frontend pareja o main)
     needs: verify
-    uses: vista-pdg/dev-workflow/.github/workflows/e2e.yml@main
+    # Revisión con Cypress v7: corrige la espera del servidor en Node 24.
+    uses: vista-pdg/dev-workflow/.github/workflows/e2e.yml@3bce988eaac695732a20f66b83bd8471e61d1e47
     with:
       backend-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       frontend-ref: auto
