@@ -43,7 +43,7 @@ public class BstInsertAlgorithm implements AlgorithmStrategy {
             "  raíz ← árbol inicial (o nulo)",
             "  para cada valor:",
             "    comparar y seguir la rama menor o mayor",
-            "    si no existe: insertar una hoja",
+            "    insertar una hoja si falta; conservar el nodo si ya existe",
             "  retornar raíz");
     steps.add(
         new AlgorithmStep(

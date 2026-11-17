@@ -2,18 +2,56 @@ package com.vista.pdg.service.algorithm;
 
 import com.vista.pdg.model.response.CodeRepresentation;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.core.io.ClassPathResource;
 
 /** Fixed educational listings, never model-generated code or executable user input. */
 public final class AlgorithmCode {
+  private static final Properties CATALOG = loadCatalog();
+  private static final Map<String, CodeRepresentation> ADDITIONAL = new ConcurrentHashMap<>();
   private static final String GUIDE =
       "https://github.com/juanmarcosdev/Estructuras-no-recursivas/tree/c395fb0b88608295d18e7dc84afaa1509a7c03eb";
 
   private AlgorithmCode() {}
+
+  /**
+   * Fixed catalog coverage; a new strategy must supply a listing rather than silently omit Java.
+   */
+  public static CodeRepresentation forAlgorithm(String key) {
+    return ADDITIONAL.computeIfAbsent(key, AlgorithmCode::fromCatalog);
+  }
+
+  private static Properties loadCatalog() {
+    var properties = new Properties();
+    try (var reader =
+        new InputStreamReader(
+            new ClassPathResource("algorithm-code/catalog.properties").getInputStream(),
+            StandardCharsets.UTF_8)) {
+      properties.load(reader);
+      return properties;
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot load educational Java catalog", e);
+    }
+  }
+
+  private static CodeRepresentation fromCatalog(String key) {
+    String file = CATALOG.getProperty(key + ".file");
+    if (file == null) throw new IllegalStateException("Missing educational Java: " + key);
+    Map<Integer, String> anchors = new LinkedHashMap<>();
+    String prefix = key + ".";
+    for (String property : CATALOG.stringPropertyNames()) {
+      if (property.startsWith(prefix) && !property.equals(prefix + "file"))
+        anchors.put(
+            Integer.parseInt(property.substring(prefix.length())), CATALOG.getProperty(property));
+    }
+    return listing(file, anchors, false);
+  }
 
   public static CodeRepresentation stack() {
     return listing(
