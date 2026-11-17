@@ -291,6 +291,41 @@ class QuizAttemptTest extends QuizTestSupport {
   }
 
   @Test
+  void simultaneousIncidentsAreAllCounted() throws Exception {
+    String course = newCourse();
+    String admin = admin();
+    String student = bearer(student(course, "qzrace"));
+    long quiz = publishedQuiz(admin, quizBody(course, 2, 1));
+    start(student, quiz);
+
+    int parallel = 12;
+    var pool = java.util.concurrent.Executors.newFixedThreadPool(parallel);
+    var ready = new java.util.concurrent.CountDownLatch(1);
+    var calls = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+    for (int i = 0; i < parallel; i++) {
+      calls.add(
+          pool.submit(
+              () -> {
+                ready.await();
+                return mockMvc
+                    .perform(
+                        authed(post("/api/quizzes/{id}/attempt/integrity", quiz), student)
+                            .content(json(Map.of("type", "COPY"))))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+              }));
+    }
+    ready.countDown();
+    for (var call : calls) assertThat(call.get()).isEqualTo(200);
+    pool.shutdown();
+
+    mockMvc
+        .perform(authed(get("/api/quizzes/{id}/attempt", quiz), student))
+        .andExpect(jsonPath("$.integrityEvents").value(parallel));
+  }
+
+  @Test
   void studentsReceiveDifferentQuestionsWhileTheBankLasts() throws Exception {
     String course = newCourse();
     String admin = admin();

@@ -229,11 +229,10 @@ public class QuizAttemptService {
   public IntegrityEventResponse reportIntegrity(User actor, Long quizId, String type) {
     QuizAttempt attempt = requireAttempt(actor, quizId);
     requireOpen(attempt, now());
-    attempt.setIntegrityEvents(attempt.getIntegrityEvents() + 1);
-    attempts.save(attempt);
+    attempts.incrementIntegrityEvents(attempt.getId());
     log.info(
         "Quiz {}: incidente de integridad '{}' en el intento {}", quizId, type, attempt.getId());
-    return new IntegrityEventResponse(attempt.getIntegrityEvents());
+    return new IntegrityEventResponse(attempts.integrityEvents(attempt.getId()));
   }
 
   @Transactional
