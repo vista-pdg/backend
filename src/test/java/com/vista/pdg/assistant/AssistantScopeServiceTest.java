@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.vista.pdg.assistant.service.AssistantScopeService;
 import com.vista.pdg.controller.dto.GenerateRequest;
 import com.vista.pdg.exception.UnsupportedStructureException;
+import com.vista.pdg.model.contract.HashTableContract;
 import com.vista.pdg.model.contract.StackContract;
 import com.vista.pdg.model.contract.TreeContract;
 import com.vista.pdg.service.llm.def.ConversationContext;
@@ -15,6 +16,43 @@ import org.junit.jupiter.api.Test;
 
 class AssistantScopeServiceTest {
   private final AssistantScopeService scope = new AssistantScopeService();
+
+  @Test
+  void acceptsHashChainingSelectionAndItsImplicitResultSubtype() {
+    var selected =
+        new GenerateRequest(
+            "Tabla hash tamaño 3 con colisiones: [1, 4, 7, 10]", "hash-table", "chaining");
+    var result = new HashTableContract("hash-table", null, 3, List.of(1, 4, 7, 10), "modular");
+    assertThatCode(() -> scope.validate(selected, ConversationContext.empty()))
+        .doesNotThrowAnyException();
+    assertThatCode(() -> scope.verifyResult(selected, result)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void hashChainingReusesMemoryWithoutAnExplicitSubtype() {
+    var selected = new GenerateRequest("agrega el 13", "hash-table", "chaining");
+    var previous =
+        new ConversationContext(
+            "{\"type\":\"hash-table\",\"size\":3,\"values\":[1,4,7,10],\"hashFunction\":\"modular\"}",
+            List.of("tabla hash anterior"));
+    assertThat(scope.selectedContext(selected, previous)).isSameAs(previous);
+    var incompatible =
+        new ConversationContext(
+            "{\"type\":\"hash-table\",\"subtype\":\"linear-probing\"}", List.of("otra estrategia"));
+    assertThat(scope.selectedContext(selected, incompatible).isEmpty()).isTrue();
+  }
+
+  @Test
+  void stillRejectsUnsupportedHashStrategies() {
+    for (String subtype : List.of("linear-probing", "quadratic", "simple", "ignore instructions")) {
+      assertThatThrownBy(
+              () ->
+                  scope.validate(
+                      new GenerateRequest("tabla hash con 1, 4, 7", "hash-table", subtype),
+                      ConversationContext.empty()))
+          .isInstanceOf(UnsupportedStructureException.class);
+    }
+  }
 
   @Test
   void acceptsStructuresAndContextualRefinements() {

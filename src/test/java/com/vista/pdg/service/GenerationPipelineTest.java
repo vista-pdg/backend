@@ -2,12 +2,15 @@ package com.vista.pdg.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.vista.pdg.assistant.service.AssistantScopeService;
+import com.vista.pdg.controller.dto.GenerateRequest;
 import com.vista.pdg.model.generated.GeneratedStructure;
 import com.vista.pdg.model.generated.Node3D;
 import com.vista.pdg.model.math.Vec3;
 import com.vista.pdg.model.response.StructureResponse;
 import com.vista.pdg.service.generator.impl.GeneratorDispatcher;
 import com.vista.pdg.service.layout.impl.LayoutDispatcher;
+import com.vista.pdg.service.llm.def.ConversationContext;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +58,30 @@ class GenerationPipelineTest {
             .isTrue();
       }
     }
+  }
+
+  @Test
+  void hashChainingSelectionGeneratesAllFourCollisionsInBucketOne() {
+    var scope = new AssistantScopeService();
+    var request =
+        new GenerateRequest(
+            "Tabla hash tamaño 3 con colisiones: [1, 4, 7, 10]", "hash-table", "chaining");
+    scope.validate(request, ConversationContext.empty());
+    var contract =
+        builder.build(
+            "{\"type\":\"hash-table\",\"size\":3,\"values\":[1,4,7,10],\"hashFunction\":\"modular\"}");
+    scope.verifyResult(request, contract);
+    var generated = generators.dispatch(contract);
+    var response = StructureResponse.of(contract, generated, layouts.compute(generated));
+    assertThat(response.nodes()).hasSize(7);
+    assertThat(response.meta().computedProperties()).containsEntry("bucketCount", 3);
+    var keys =
+        response.nodes().stream().filter(n -> n.properties().containsKey("hashBucket")).toList();
+    assertThat(keys).extracting(Node3D::label).containsExactly("1", "4", "7", "10");
+    assertThat(keys).allSatisfy(n -> assertThat(n.properties()).containsEntry("hashBucket", 1));
+    assertThat(response.edges()).extracting(e -> e.from()).containsExactly("b1", "v0", "v1", "v2");
+    assertThat(response.edges()).extracting(e -> e.to()).containsExactly("v0", "v1", "v2", "v3");
+    assertAllApart(response, 0.9);
   }
 
   @ParameterizedTest(name = "{0}")

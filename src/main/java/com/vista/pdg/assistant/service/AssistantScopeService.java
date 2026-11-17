@@ -70,6 +70,7 @@ public class AssistantScopeService {
         switch (type) {
           case "tree" -> Set.of("avl", "bst", "heap", "btree");
           case "linked-list" -> Set.of("singly", "doubly", "circular");
+          case "hash-table" -> Set.of("chaining");
           case "graph", "stack", "queue" -> Set.of("simple");
           default -> Set.of();
         };
@@ -83,7 +84,12 @@ public class AssistantScopeService {
       if (request.type().equals(contract.path("type").asText())
           && (request.subtype() == null
               || request.subtype().equals("simple")
-              || request.subtype().equals(contract.path("subtype").asText()))) return context;
+              || request
+                  .subtype()
+                  .equals(
+                      effectiveSubtype(
+                          contract.path("type").asText(), contract.path("subtype").asText(null)))))
+        return context;
     } catch (Exception ignored) {
       // Missing/malformed memory must not override an explicit selected structure.
     }
@@ -113,9 +119,14 @@ public class AssistantScopeService {
             : contract instanceof LinkedListContract list ? list.subtype() : null;
     if (request.subtype() != null
         && !request.subtype().equals("simple")
-        && !request.subtype().equals(subtype)) {
+        && !request.subtype().equals(effectiveSubtype(contract.type(), subtype))) {
       reject("La respuesta no corresponde al subtipo seleccionado.");
     }
+  }
+
+  private static String effectiveSubtype(String type, String subtype) {
+    // HashTableContract has no subtype field; its generator always uses separate chaining.
+    return "hash-table".equals(type) && subtype == null ? "chaining" : subtype;
   }
 
   private static void reject(String message) {
