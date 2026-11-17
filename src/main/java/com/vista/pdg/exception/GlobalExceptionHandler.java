@@ -46,6 +46,15 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
   }
 
+  @ExceptionHandler(com.vista.pdg.quiz.service.QuizException.class)
+  public ResponseEntity<ApiError> handleQuiz(com.vista.pdg.quiz.service.QuizException ex) {
+    ApiError body =
+        ex.field() == null
+            ? ApiError.of(ex.code(), ex.getMessage())
+            : ApiError.field(ex.code(), ex.getMessage(), Map.of(ex.field(), ex.getMessage()));
+    return ResponseEntity.status(ex.status()).body(body);
+  }
+
   @ExceptionHandler(com.vista.pdg.auth.service.UserService.UserNotFoundException.class)
   public ResponseEntity<ApiError> handleUserNotFound(RuntimeException ex) {
     return ResponseEntity.status(404).body(ApiError.of("USER_NOT_FOUND", ex.getMessage()));

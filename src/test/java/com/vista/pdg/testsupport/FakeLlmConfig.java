@@ -35,10 +35,25 @@ public class FakeLlmConfig {
    */
   public static final AtomicReference<ConversationContext> LAST_CONTEXT = new AtomicReference<>();
 
+  /**
+   * Respuesta del banco de quizzes (HU-34). Nula = sustituto determinista, una pregunta válida por
+   * escenario; una prueba la reemplaza para simular un modelo caído o que ignora el formato.
+   */
+  public static final AtomicReference<java.util.function.UnaryOperator<String>> QUIZ_RESPONDER =
+      new AtomicReference<>();
+
   @Bean
   @Primary
   public LlmAdapter fakeLlmAdapter() {
     return new LlmAdapter() {
+      @Override
+      public String completeJson(String systemPrompt, String userPrompt) {
+        var responder = QUIZ_RESPONDER.get();
+        return responder == null
+            ? com.vista.pdg.quiz.service.QuizStubResponses.forPrompt(userPrompt)
+            : responder.apply(userPrompt);
+      }
+
       @Override
       public StructureContract generate(String userPrompt) {
         return generate(userPrompt, ConversationContext.empty());

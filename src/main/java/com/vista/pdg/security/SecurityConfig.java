@@ -52,6 +52,9 @@ public class SecurityConfig {
                     // HU-06: docentes por asignación y administradores; el estudiante recibe 403.
                     .requestMatchers("/api/analytics/**")
                     .hasAnyRole("TEACHER", "ADMIN")
+                    // HU-34: la gestión de quizzes es docente; el curso se valida en el servicio.
+                    .requestMatchers("/api/quizzes/manage/**")
+                    .hasAnyRole("TEACHER", "ADMIN")
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                     // HU-16 CA-3: el asistente ya no es anónimo. Cae en

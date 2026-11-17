@@ -50,6 +50,12 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
     }
   }
 
+  /** HU-34: misma llamada que la generación de contratos, sin pasar por el ContractBuilder. */
+  @Override
+  public String completeJson(String systemPrompt, String userPrompt) {
+    return callModel(systemPrompt, userPrompt);
+  }
+
   @Override
   protected String callModel(String systemPrompt, String userPrompt) {
     log.debug("Calling Gemini model '{}' — prompt: {}", model, userPrompt);

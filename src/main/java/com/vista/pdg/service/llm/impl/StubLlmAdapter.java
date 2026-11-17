@@ -48,6 +48,12 @@ public class StubLlmAdapter implements LlmAdapter {
     log.warn("Perfil e2e activo: /api/generate responde con un grafo fijo, NO llama a Gemini");
   }
 
+  /** HU-34: banco de preguntas determinista, una pregunta válida por escenario. */
+  @Override
+  public String completeJson(String systemPrompt, String userPrompt) {
+    return com.vista.pdg.quiz.service.QuizStubResponses.forPrompt(userPrompt);
+  }
+
   /** «grafo de 12 nodos», «ciclo con 8 vértices»: el número manda; sin número, K3. */
   private static final Pattern SIZE = Pattern.compile("(\\d{1,2})\\s*(v[ée]rtices|nodos)");
 

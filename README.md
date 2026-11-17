@@ -254,6 +254,13 @@ La cuota por curso la fija el administrador con `PUT /api/admin/courses/{code}/q
 (`GET /api/admin/courses/{code}/quota-history`). El cambio aplica de inmediato a todos los
 estudiantes del curso; la ráfaga no descuenta cuota.
 
+### Quizzes interactivos (HU-34)
+
+Docentes y administradores generan con IA un banco de preguntas sobre los algoritmos del catálogo,
+lo publican como quiz de un curso y consultan resultados y reportes CSV/XLSX; los estudiantes del
+curso lo presentan una vez, con plazo controlado por el servidor. Ver
+[modelo, generación verificada y API](docs/quizzes.md).
+
 ### Errores de la API
 
 Un cuerpo que no se puede leer —JSON roto, un campo primitivo ausente— responde **400** con

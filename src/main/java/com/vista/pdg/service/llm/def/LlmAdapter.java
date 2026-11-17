@@ -13,4 +13,12 @@ public interface LlmAdapter {
   default StructureContract generate(String userPrompt, ConversationContext context) {
     return generate(userPrompt);
   }
+
+  /**
+   * Completa un prompt libre y devuelve JSON en texto (HU-34: banco de preguntas). Por defecto no
+   * está disponible, de modo que un adaptador que solo sepa generar contratos sigue siendo válido.
+   */
+  default String completeJson(String systemPrompt, String userPrompt) {
+    throw new UnsupportedOperationException("Este adaptador no admite respuestas JSON libres");
+  }
 }
