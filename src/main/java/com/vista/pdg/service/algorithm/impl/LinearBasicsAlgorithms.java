@@ -244,7 +244,7 @@ public final class LinearBasicsAlgorithms {
             case "delete" ->
                 List.of(
                     "eliminar_primero(lista, objetivo):",
-                    "  recorrer conservando el anterior",
+                    "  obtener la secuencia y recorrer por posición",
                     "  comparar el valor actual",
                     "  reenlazar sin la primera coincidencia; retornar lista");
             default ->

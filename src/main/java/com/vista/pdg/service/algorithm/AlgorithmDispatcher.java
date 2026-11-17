@@ -30,6 +30,8 @@ public class AlgorithmDispatcher {
     String key = request.type() + "/" + request.subtype() + "/" + request.operation();
     AlgorithmStrategy strategy = strategies.get(key);
     if (strategy == null) return StepsResponse.error("Algoritmo no soportado: " + key);
-    return strategy.generate(request);
+    var response = strategy.generate(request);
+    if (response.error() || !response.representations().isEmpty()) return response;
+    return response.withJava(AlgorithmCode.forAlgorithm(key));
   }
 }
