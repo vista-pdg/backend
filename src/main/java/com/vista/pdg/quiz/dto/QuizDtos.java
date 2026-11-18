@@ -40,7 +40,33 @@ public final class QuizDtos {
           Integer timeLimitMinutes,
       @NotNull(message = "Indica la fecha de apertura") Instant opensAt,
       @NotNull(message = "Indica la fecha de cierre") Instant closesAt,
-      boolean showGrade) {}
+      boolean showGrade,
+      @Size(max = 2000, message = "Las instrucciones admiten hasta 2000 caracteres")
+          String instructions) {
+    /** Compatibilidad: un quiz sin instrucciones para la IA (HU-34). */
+    public CreateQuizRequest(
+        String courseCode,
+        String title,
+        List<String> topics,
+        Integer questionsPerStudent,
+        Integer studentCount,
+        Integer timeLimitMinutes,
+        Instant opensAt,
+        Instant closesAt,
+        boolean showGrade) {
+      this(
+          courseCode,
+          title,
+          topics,
+          questionsPerStudent,
+          studentCount,
+          timeLimitMinutes,
+          opensAt,
+          closesAt,
+          showGrade,
+          null);
+    }
+  }
 
   /** {@code phase}: DRAFT, SCHEDULED, OPEN o CLOSED según el estado y la ventana. */
   public record QuizSummaryDto(
@@ -62,6 +88,10 @@ public final class QuizDtos {
       int attemptsStarted,
       int attemptsFinished) {}
 
+  /**
+   * {@code editable} (HU-36): el quiz es borrador o la pregunta nunca se asignó. {@code editKind}:
+   * {@code MANUAL}, {@code AI} o nulo.
+   */
   public record BankQuestionDto(
       Long id,
       String topicKey,
@@ -71,9 +101,59 @@ public final class QuizDtos {
       List<String> options,
       int correctIndex,
       String explanation,
-      int timesAssigned) {}
+      String hint,
+      int timesAssigned,
+      boolean editable,
+      String editKind,
+      Instant editedAt) {}
 
-  public record QuizDetailDto(QuizSummaryDto quiz, List<BankQuestionDto> questions) {}
+  /** HU-36: una fuente de material ya leída; nunca incluye el texto completo. */
+  public record MaterialDto(
+      Long id,
+      String kind,
+      String name,
+      String source,
+      String format,
+      String formatLabel,
+      int pages,
+      int characters,
+      boolean truncated,
+      Instant createdAt) {}
+
+  public record QuizDetailDto(
+      QuizSummaryDto quiz,
+      List<BankQuestionDto> questions,
+      String instructions,
+      List<MaterialDto> materials) {}
+
+  public record GuidanceRequest(
+      @Size(max = 2000, message = "Las instrucciones admiten hasta 2000 caracteres")
+          String instructions) {}
+
+  public record GuidanceDto(String instructions, List<MaterialDto> materials) {}
+
+  public record MaterialLinkRequest(
+      @NotBlank(message = "Escribe un enlace")
+          @Size(max = 2048, message = "El enlace es demasiado largo")
+          String url,
+      boolean crawl) {}
+
+  /** HU-36 · CA-3: contenido editable de una pregunta; el escenario no se edita. */
+  public record QuestionEditRequest(
+      @NotNull(message = "Escribe el enunciado") String statement,
+      @NotNull(message = "Escribe las cuatro opciones") List<String> options,
+      @NotNull(message = "Marca la opción correcta") Integer correctIndex,
+      String explanation,
+      String hint,
+      String source) {}
+
+  public record AiProposalRequest(
+      @NotBlank(message = "Escribe qué quieres cambiar")
+          @Size(max = 600, message = "Las instrucciones admiten hasta 600 caracteres")
+          String instruction) {}
+
+  public record AiProposalDto(
+      String statement, List<String> options, int correctIndex, String explanation, String hint) {}
 
   public record GenerateBatchResponse(
       int generated, int discarded, int bankSize, int bankTarget, boolean complete) {}
@@ -185,9 +265,15 @@ public final class QuizDtos {
       List<AttemptQuestionDto> questions,
       AttemptResultDto result) {}
 
+  /** {@code elapsedMs} (HU-36): tiempo visible de la pregunta; el servidor lo acota al intento. */
   public record AnswerRequest(
       @Min(value = 0, message = "Opción inválida") @Max(value = 3, message = "Opción inválida")
-          Integer selectedOption) {}
+          Integer selectedOption,
+      @Min(value = 0, message = "Tiempo inválido") Long elapsedMs) {
+    public AnswerRequest(Integer selectedOption) {
+      this(selectedOption, null);
+    }
+  }
 
   public record IntegrityEventRequest(
       @NotBlank(message = "Indica el tipo de incidente")

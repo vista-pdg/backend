@@ -72,6 +72,10 @@ public class Quiz {
   @Column(name = "published_at")
   private Instant publishedAt;
 
+  /** HU-36: directivas del docente para la IA; se suman a las reglas del redactor. */
+  @Column(columnDefinition = "text")
+  private String instructions;
+
   public int bankTarget() {
     return questionsPerStudent * expectedStudents;
   }

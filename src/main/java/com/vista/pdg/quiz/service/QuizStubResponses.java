@@ -34,6 +34,28 @@ public final class QuizStubResponses {
                     + prompt.path("pregunta_estudiante").asText(""))
             .toString();
       }
+      // HU-36: la revisión devuelve una versión marcada como revisada del mismo escenario.
+      if (prompt.has("cambios_pedidos")) {
+        ObjectNode root = MAPPER.createObjectNode();
+        ObjectNode question = root.putArray("questions").addObject();
+        int id = prompt.path("escenarios").path(0).path("id").asInt(1);
+        question.put("scenarioId", id);
+        question.put(
+            "statement",
+            "Versión revisada: "
+                + prompt.path("pregunta_actual").path("statement").asText("")
+                + " ("
+                + prompt.path("cambios_pedidos").asText("")
+                + ")");
+        ArrayNode options = question.putArray("options");
+        for (int i = 0; i < ENDINGS.length; i++) {
+          options.add("Revisada " + (i + 1) + ": la operación " + ENDINGS[i]);
+        }
+        question.put("correctIndex", correctIndex(id));
+        question.put("explanation", "Justificación revisada del sustituto de pruebas.");
+        question.put("hint", "Pista revisada: observa el escenario en VISTA.");
+        return root.toString();
+      }
     } catch (Exception e) {
       // Prompt ilegible: se trata como el del banco.
     }

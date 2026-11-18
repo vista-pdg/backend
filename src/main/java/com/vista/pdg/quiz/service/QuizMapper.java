@@ -1,11 +1,14 @@
 package com.vista.pdg.quiz.service;
 
 import com.vista.pdg.quiz.dto.QuizDtos.AttemptResultDto;
+import com.vista.pdg.quiz.dto.QuizDtos.MaterialDto;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizSummaryDto;
 import com.vista.pdg.quiz.dto.QuizDtos.TopicDto;
 import com.vista.pdg.quiz.entity.Quiz;
 import com.vista.pdg.quiz.entity.QuizAttempt;
+import com.vista.pdg.quiz.entity.QuizMaterial;
 import com.vista.pdg.quiz.entity.QuizStatus;
+import com.vista.pdg.quiz.material.MaterialFormat;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,22 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class QuizMapper {
+  /** HU-36: metadatos de una fuente de material; el texto no sale del servidor. */
+  public static MaterialDto material(QuizMaterial m) {
+    MaterialFormat format = MaterialFormat.valueOf(m.getFormat());
+    return new MaterialDto(
+        m.getId(),
+        m.getKind(),
+        m.getName(),
+        m.getSource(),
+        format.name(),
+        format.label(),
+        m.getPages(),
+        m.getCharacters(),
+        m.isTruncated(),
+        m.getCreatedAt());
+  }
+
   static final double MAX_GRADE = 5.0;
 
   private final QuizTopics topics;

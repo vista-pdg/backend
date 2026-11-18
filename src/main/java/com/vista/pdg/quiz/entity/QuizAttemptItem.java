@@ -48,6 +48,10 @@ public class QuizAttemptItem {
   @Column(name = "answered_at")
   private Instant answeredAt;
 
+  /** HU-36: tiempo visible de la pregunta hasta su última respuesta, acotado al intento. */
+  @Column(name = "time_spent_ms")
+  private Integer timeSpentMs;
+
   public List<Integer> order() {
     return Arrays.stream(optionOrder.split(",")).map(Integer::valueOf).toList();
   }

@@ -53,11 +53,50 @@ public class QuizQuestionWriter {
       String hint) {}
 
   public List<Draft> write(AlgorithmDescriptor topic, List<Scenario> scenarios) {
-    String raw = llm.completeJson(systemPrompt(), userPrompt(topic, scenarios));
+    return write(topic, scenarios, QuizGuidance.NONE);
+  }
+
+  public List<Draft> write(
+      AlgorithmDescriptor topic, List<Scenario> scenarios, QuizGuidance guidance) {
+    String raw = llm.completeJson(systemPrompt(), userPrompt(topic, scenarios, guidance));
     return parse(raw, scenarios);
   }
 
+  /**
+   * HU-36 · CA-4: reescribe una pregunta del banco según lo que pide el docente, sobre el mismo
+   * escenario y con las mismas validaciones. Vacío si el modelo no propone una versión válida.
+   */
+  public java.util.Optional<Draft> revise(
+      AlgorithmDescriptor topic,
+      Scenario scenario,
+      Draft current,
+      String changes,
+      QuizGuidance guidance) {
+    Map<String, Object> body = body(topic, List.of(scenario), guidance);
+    Map<String, Object> question = new LinkedHashMap<>();
+    question.put("statement", current.statement());
+    question.put("options", current.options());
+    question.put("correctIndex", current.correctIndex());
+    question.put("explanation", current.explanation());
+    question.put("hint", current.hint());
+    body.put("pregunta_actual", question);
+    body.put("cambios_pedidos", changes.strip());
+    String raw =
+        llm.completeJson(
+            systemPrompt() + "\n\n" + resource("prompts/quiz/revision-prompt.txt"), json(body));
+    return parse(raw, List.of(scenario)).stream().findFirst();
+  }
+
   String userPrompt(AlgorithmDescriptor topic, List<Scenario> scenarios) {
+    return userPrompt(topic, scenarios, QuizGuidance.NONE);
+  }
+
+  String userPrompt(AlgorithmDescriptor topic, List<Scenario> scenarios, QuizGuidance guidance) {
+    return json(body(topic, scenarios, guidance));
+  }
+
+  private Map<String, Object> body(
+      AlgorithmDescriptor topic, List<Scenario> scenarios, QuizGuidance guidance) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("tema", QuizTopics.label(topic));
     body.put("descripcion", topic.description());
@@ -73,6 +112,24 @@ public class QuizQuestionWriter {
                   return item;
                 })
             .toList());
+    if (guidance.instructions() != null) body.put("instrucciones_docente", guidance.instructions());
+    if (!guidance.excerpts().isEmpty()) {
+      body.put(
+          "material_de_referencia",
+          guidance.excerpts().stream()
+              .map(
+                  e -> {
+                    Map<String, Object> excerpt = new LinkedHashMap<>();
+                    excerpt.put("fuente", e.source());
+                    excerpt.put("extracto", e.text());
+                    return excerpt;
+                  })
+              .toList());
+    }
+    return body;
+  }
+
+  private String json(Map<String, Object> body) {
     try {
       return mapper.writeValueAsString(body);
     } catch (IOException e) {
@@ -117,7 +174,7 @@ public class QuizQuestionWriter {
       String text = option.asText("").strip();
       String normalized = normalize(text);
       if (text.isEmpty() || text.length() > MAX_OPTION || !seen.add(normalized)) return null;
-      if (WILDCARDS.stream().anyMatch(normalized::contains)) return null;
+      if (isWildcard(normalized)) return null;
       shortest = Math.min(shortest, text.length());
       longest = Math.max(longest, text.length());
       options.add(text);
@@ -129,6 +186,11 @@ public class QuizQuestionWriter {
     String explanation = node.path("explanation").asText("").strip();
     String hint = node.path("hint").asText("").strip();
     return new Draft(scenario, statement, List.copyOf(options), correct, explanation, hint);
+  }
+
+  /** Comodines que pierden sentido cuando las opciones se barajan por estudiante. */
+  static boolean isWildcard(String normalized) {
+    return WILDCARDS.stream().anyMatch(normalized::contains);
   }
 
   private static int secondLongest(List<String> options) {
@@ -156,9 +218,12 @@ public class QuizQuestionWriter {
   }
 
   private static String systemPrompt() {
+    return resource("prompts/quiz/system-prompt.txt");
+  }
+
+  private static String resource(String path) {
     try {
-      return new ClassPathResource("prompts/quiz/system-prompt.txt")
-          .getContentAsString(StandardCharsets.UTF_8);
+      return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw new IllegalStateException("No se pudo cargar el prompt de quizzes", e);
     }

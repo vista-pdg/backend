@@ -52,7 +52,8 @@ public class QuizStudentController {
       @PathVariable Long quizId,
       @PathVariable int position,
       @Valid @RequestBody AnswerRequest request) {
-    return noStore(attempts.answer(actor, quizId, position, request.selectedOption()));
+    return noStore(
+        attempts.answer(actor, quizId, position, request.selectedOption(), request.elapsedMs()));
   }
 
   @PostMapping("/{quizId}/attempt/integrity")

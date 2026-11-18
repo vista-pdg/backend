@@ -9,105 +9,162 @@ import com.vista.pdg.telemetry.repository.PedagogicalAnalyticsRepository.*;
 import java.util.Comparator;
 import java.util.List;
 
-/** Una única frontera de divulgación, compartida por JSON y CSV. */
+/**
+ * Una única frontera de divulgación, compartida por JSON y CSV. HU-36 · CA-5: el mínimo de cinco
+ * estudiantes del Anexo B se exige al grupo en el periodo, no a cada fila. Por debajo, el reporte
+ * no publica ninguna métrica.
+ */
 public final class AnalyticsDisclosure {
   public static final int MINIMUM_PARTICIPANTS = 5;
   public static final String INSUFFICIENT = "Datos insuficientes para garantizar el anonimato";
 
   private AnalyticsDisclosure() {}
 
-  public static PedagogicalReport disclose(
-      CourseDto course,
-      AnalyticsFilter filter,
-      double threshold,
+  /** Lo que el servicio ya calculó para un curso y un periodo. */
+  public record Measured(
+      int activeStudents,
+      int enrolledStudents,
       List<StructureCount> structures,
       List<AlgorithmCount> algorithms,
-      List<RetryCount> retries) {
-    boolean allStructuresVisible = structures.stream().allMatch(r -> eligible(r.participants()));
-    long total = structures.stream().mapToLong(StructureCount::frequency).sum();
-    List<StructureMetric> structureMetrics =
-        structures.stream()
+      List<RetryCount> retries,
+      LearningInsights.Result learning) {}
+
+  public static PedagogicalReport disclose(
+      CourseDto course, AnalyticsFilter filter, QuizRef quiz, double threshold, Measured measured) {
+    if (measured.activeStudents() < MINIMUM_PARTICIPANTS) {
+      return report(
+          course,
+          filter,
+          quiz,
+          threshold,
+          SUPPRESSED,
+          null,
+          null,
+          null,
+          null,
+          List.of(),
+          List.of(),
+          List.of(),
+          List.of(),
+          List.of(),
+          List.of(),
+          List.of());
+    }
+    long total = measured.structures().stream().mapToLong(StructureCount::frequency).sum();
+    List<StructureMetric> structures =
+        measured.structures().stream()
             .map(
                 r ->
-                    eligible(r.participants())
-                        ? new StructureMetric(
-                            r.structure(),
-                            AVAILABLE,
-                            r.frequency(),
-                            allStructuresVisible && total > 0
-                                ? 100.0 * r.frequency() / total
-                                : null)
-                        : new StructureMetric(r.structure(), SUPPRESSED, null, null))
+                    new StructureMetric(
+                        r.structure(),
+                        AVAILABLE,
+                        r.frequency(),
+                        total > 0 ? 100.0 * r.frequency() / total : null))
             .sorted(
-                Comparator.comparing(
-                        StructureMetric::frequency, Comparator.nullsLast(Comparator.reverseOrder()))
+                Comparator.comparing(StructureMetric::frequency, Comparator.reverseOrder())
                     .thenComparing(StructureMetric::structure))
             .toList();
-    List<AlgorithmMetric> algorithmMetrics =
-        algorithms.stream()
+    List<AlgorithmMetric> algorithms =
+        measured.algorithms().stream()
             .map(
                 r -> {
-                  if (!eligible(r.participants()))
-                    return new AlgorithmMetric(r.algorithm(), SUPPRESSED, null, SUPPRESSED, null);
-                  // Un promedio parcial se interpretaría como el de todas las ejecuciones: se
-                  // declara ausente.
-                  Status stepsStatus =
-                      r.measuredExecutions() != r.executions()
-                          ? UNAVAILABLE
-                          : eligible(r.measuredParticipants()) ? AVAILABLE : SUPPRESSED;
+                  // Un promedio parcial se interpretaría como el de todas las ejecuciones.
+                  boolean measuredAll = r.measuredExecutions() == r.executions();
                   return new AlgorithmMetric(
                       r.algorithm(),
                       AVAILABLE,
                       r.executions(),
-                      stepsStatus,
-                      stepsStatus == AVAILABLE ? r.averageSteps() : null);
+                      measuredAll ? AVAILABLE : UNAVAILABLE,
+                      measuredAll ? r.averageSteps() : null);
                 })
             .sorted(
-                Comparator.comparing(
-                        AlgorithmMetric::executions,
-                        Comparator.nullsLast(Comparator.reverseOrder()))
+                Comparator.comparing(AlgorithmMetric::executions, Comparator.reverseOrder())
                     .thenComparing(AlgorithmMetric::algorithm))
             .toList();
-    List<RetryMetric> retryMetrics =
-        retries.stream()
+    List<RetryMetric> retries =
+        measured.retries().stream()
             .map(
                 r -> {
-                  // También se protege cada subgrupo no vacío del cociente, incluido su
-                  // complemento.
-                  if (!eligible(r.participants())
-                      || smallNonempty(r.retryParticipants())
-                      || smallNonempty(r.otherParticipants())) {
-                    return new RetryMetric(r.structure(), SUPPRESSED, null, null, null, null);
-                  }
                   double rate = (double) r.retries() / r.sessions();
                   return new RetryMetric(
                       r.structure(), AVAILABLE, r.sessions(), r.retries(), rate, rate > threshold);
                 })
             .sorted(
-                Comparator.comparing(
-                        RetryMetric::retryRate, Comparator.nullsLast(Comparator.reverseOrder()))
+                Comparator.comparing(RetryMetric::retryRate, Comparator.reverseOrder())
                     .thenComparing(RetryMetric::structure))
             .toList();
+    LearningInsights.Result l = measured.learning();
+    Overview overview =
+        new Overview(
+            total,
+            algorithms.stream().mapToLong(AlgorithmMetric::executions).sum(),
+            l.quizAnswers(),
+            l.quizAccuracy(),
+            l.unansweredRate(),
+            l.quizzesWithAnswers(),
+            l.finishedAttempts(),
+            l.studyAnswers(),
+            l.studyAccuracy(),
+            l.medianSeconds(),
+            l.timedShare());
+    return report(
+        course,
+        filter,
+        quiz,
+        threshold,
+        AVAILABLE,
+        measured.activeStudents(),
+        measured.enrolledStudents(),
+        total,
+        overview,
+        l.topics(),
+        l.hardest(),
+        l.easiest(),
+        l.quizzes(),
+        structures,
+        algorithms,
+        retries);
+  }
+
+  private static PedagogicalReport report(
+      CourseDto course,
+      AnalyticsFilter filter,
+      QuizRef quiz,
+      double threshold,
+      Status status,
+      Integer active,
+      Integer enrolled,
+      Long total,
+      Overview overview,
+      List<TopicInsight> topics,
+      List<QuestionInsight> hardest,
+      List<QuestionInsight> easiest,
+      List<QuizInsight> quizzes,
+      List<StructureMetric> structures,
+      List<AlgorithmMetric> algorithms,
+      List<RetryMetric> retries) {
     return new PedagogicalReport(
         course,
         filter.from(),
         filter.to(),
+        filter.wholeTerm(),
+        quiz,
         AnalyticsFilter.ZONE.getId(),
         MINIMUM_PARTICIPANTS,
+        status,
+        active,
+        enrolled,
         threshold,
         3,
         120,
-        allStructuresVisible ? total : null,
-        structureMetrics,
-        algorithmMetrics,
-        retryMetrics);
-  }
-
-  private static boolean eligible(long participants) {
-    return participants >= MINIMUM_PARTICIPANTS;
-  }
-
-  private static boolean smallNonempty(long participants) {
-    return participants > 0 && !eligible(participants);
+        total,
+        overview,
+        topics,
+        hardest,
+        easiest,
+        quizzes,
+        structures,
+        algorithms,
+        retries);
   }
 }

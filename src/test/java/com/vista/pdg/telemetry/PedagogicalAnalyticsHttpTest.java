@@ -47,10 +47,11 @@ class PedagogicalAnalyticsHttpTest {
         AnalyticsFilter.parse(
             Map.of("courseCode", "CEDI-G1", "from", "2026-04-01", "to", "2026-04-30"));
     var report =
-        AnalyticsDisclosure.disclose(
+        AnalyticsDisclosureTest.disclose(
             new CourseDto("CEDI-G1", "CEDI", "2026-1"),
             filter,
             .3,
+            4,
             List.of(new StructureCount("pila", 400, 4)),
             List.of(),
             List.of());
@@ -58,8 +59,9 @@ class PedagogicalAnalyticsHttpTest {
     mvc.perform(get("/api/analytics/report" + query))
         .andExpect(status().isOk())
         .andExpect(header().string("Cache-Control", "no-store"))
-        .andExpect(jsonPath("$.structures[0].status").value("SUPPRESSED"))
-        .andExpect(jsonPath("$.structures[0].frequency").doesNotExist())
+        .andExpect(jsonPath("$.status").value("SUPPRESSED"))
+        .andExpect(jsonPath("$.structures").isEmpty())
+        .andExpect(jsonPath("$.activeStudents").doesNotExist())
         .andExpect(jsonPath("$.totalRequests").doesNotExist());
     var csv =
         mvc.perform(get("/api/analytics/report.csv" + query))
@@ -69,7 +71,7 @@ class PedagogicalAnalyticsHttpTest {
                 header()
                     .string(
                         "Content-Disposition",
-                        "attachment; filename=\"vista-analitica-2026-04-01-2026-04-30.csv\""))
+                        "attachment; filename=\"vista-analitica-CEDI-G1-2026-04-01-2026-04-30.csv\""))
             .andReturn()
             .getResponse()
             .getContentAsString(StandardCharsets.UTF_8);
@@ -92,8 +94,37 @@ class PedagogicalAnalyticsHttpTest {
       mvc.perform(get("/api/analytics/" + path + query.replace("2026-04-30", "2026-04-31")))
           .andExpect(status().isBadRequest());
       mvc.perform(get("/api/analytics/" + path)).andExpect(status().isBadRequest());
+      mvc.perform(get("/api/analytics/" + path + query + "&quizId=uno"))
+          .andExpect(status().isBadRequest());
     }
     verifyNoInteractions(analytics);
+  }
+
+  @Test
+  void datesAreOptionalAndQuizzesAreListedWithoutCaching() throws Exception {
+    var filter = AnalyticsFilter.parse(Map.of("courseCode", "CEDI-G1"));
+    when(analytics.report(null, filter))
+        .thenReturn(
+            AnalyticsDisclosureTest.disclose(
+                new CourseDto("CEDI-G1", "CEDI", "2026-1"),
+                filter,
+                .3,
+                5,
+                List.of(),
+                List.of(),
+                List.of()));
+    mvc.perform(get("/api/analytics/report?courseCode=CEDI-G1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.wholeTerm").value(true))
+        .andExpect(jsonPath("$.status").value("AVAILABLE"));
+    when(analytics.quizzes(null, "CEDI-G1"))
+        .thenReturn(List.of(new com.vista.pdg.telemetry.dto.PedagogicalReport.QuizRef(4L, "Q1")));
+    mvc.perform(get("/api/analytics/quizzes?courseCode=CEDI-G1"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("$[0].title").value("Q1"));
+    mvc.perform(get("/api/analytics/quizzes?courseCode==SUM(A1)"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

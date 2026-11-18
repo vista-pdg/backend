@@ -61,7 +61,7 @@ public class StudyQuizController {
       @PathVariable Long id,
       @PathVariable int position,
       @Valid @RequestBody StudyAnswerRequest request) {
-    return study.answer(actor, id, position, request.selectedOption());
+    return study.answer(actor, id, position, request.selectedOption(), request.elapsedMs());
   }
 
   @PostMapping("/{id}/questions/{position}/hint")

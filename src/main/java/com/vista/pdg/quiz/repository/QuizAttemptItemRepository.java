@@ -8,4 +8,6 @@ public interface QuizAttemptItemRepository extends JpaRepository<QuizAttemptItem
   List<QuizAttemptItem> findByAttempt_IdOrderByPositionAsc(Long attemptId);
 
   List<QuizAttemptItem> findByAttempt_Quiz_IdOrderByAttempt_IdAscPositionAsc(Long quizId);
+
+  long countByQuestion_Id(Long questionId);
 }

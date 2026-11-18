@@ -29,6 +29,18 @@ public class PedagogicalAnalyticsController {
         .body(assignments.availableCourses(actor));
   }
 
+  /** HU-36: quizzes publicados del curso, para el filtro opcional. */
+  @GetMapping("/quizzes")
+  public ResponseEntity<List<PedagogicalReport.QuizRef>> quizzes(
+      @AuthenticationPrincipal User actor, @RequestParam String courseCode) {
+    if (!courseCode.matches("[A-Za-z0-9_-]{1,32}")) {
+      throw AnalyticsRequestException.invalid("Selecciona un curso válido");
+    }
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(analytics.quizzes(actor, courseCode));
+  }
+
   @GetMapping("/report")
   public ResponseEntity<PedagogicalReport> report(
       @AuthenticationPrincipal User actor, @RequestParam MultiValueMap<String, String> params) {
@@ -47,11 +59,7 @@ public class PedagogicalAnalyticsController {
         .header(HttpHeaders.CACHE_CONTROL, "no-store")
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
-            "attachment; filename=\"vista-analitica-"
-                + filter.from()
-                + "-"
-                + filter.to()
-                + ".csv\"")
+            "attachment; filename=\"" + AnalyticsCsv.filename(report) + "\"")
         .body(AnalyticsCsv.render(report).getBytes(StandardCharsets.UTF_8));
   }
 

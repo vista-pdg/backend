@@ -38,6 +38,10 @@ public class StudyQuestion {
   @Column(name = "answered_at")
   private Instant answeredAt;
 
+  /** HU-36: tiempo visible de la pregunta hasta que el estudiante la comprobó. */
+  @Column(name = "time_spent_ms")
+  private Integer timeSpentMs;
+
   @Column(name = "hint_shown", nullable = false)
   private boolean hintShown;
 

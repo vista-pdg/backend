@@ -21,6 +21,7 @@ import com.vista.pdg.quiz.service.QuizQuestionGenerator.Batch;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -161,12 +162,24 @@ public class StudyQuizService {
 
   @Transactional
   public StudyQuestionDto answer(User actor, Long id, int position, int selectedOption) {
+    return answer(actor, id, position, selectedOption, null);
+  }
+
+  /** HU-36: el tiempo visible se acota a lo transcurrido desde que la pregunta existe. */
+  @Transactional
+  public StudyQuestionDto answer(
+      User actor, Long id, int position, int selectedOption, Long elapsedMs) {
     StudyQuestion question = requireQuestion(actor, id, position);
     if (question.resolved()) {
       throw QuizException.conflict("ALREADY_RESOLVED", "Esta pregunta ya está resuelta");
     }
     question.setSelectedOption(selectedOption);
-    question.setAnsweredAt(clock.instant());
+    Instant now = clock.instant();
+    question.setAnsweredAt(now);
+    if (elapsedMs != null) {
+      long bound = Math.max(0, Duration.between(question.getCreatedAt(), now).toMillis());
+      question.setTimeSpentMs((int) Math.min(Math.min(elapsedMs, bound), Integer.MAX_VALUE));
+    }
     return dto(questions.save(question));
   }
 

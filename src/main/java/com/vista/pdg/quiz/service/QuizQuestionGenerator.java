@@ -37,6 +37,11 @@ public class QuizQuestionGenerator {
   }
 
   public Batch generate(AlgorithmDescriptor topic, int count) {
+    return generate(topic, count, QuizGuidance.NONE);
+  }
+
+  /** HU-36: el banco de un quiz de curso envía las instrucciones y el material del docente. */
+  public Batch generate(AlgorithmDescriptor topic, int count, QuizGuidance guidance) {
     List<Scenario> drawn = new ArrayList<>();
     for (int i = 1; i <= count; i++) scenarios.build(topic, random, i).ifPresent(drawn::add);
     if (drawn.isEmpty()) {
@@ -47,7 +52,7 @@ public class QuizQuestionGenerator {
     }
     List<Draft> drafts;
     try {
-      drafts = writer.write(topic, drawn);
+      drafts = writer.write(topic, drawn, guidance);
     } catch (LlmUnavailableException | LlmExhaustedException e) {
       throw QuizException.unavailable(e.getMessage());
     } catch (UnsupportedOperationException e) {

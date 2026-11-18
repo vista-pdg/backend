@@ -205,24 +205,26 @@ class PedagogicalAnalyticsTest extends IntegrationTestSupport {
     var historicalEvent = event(5, "pila", "unknown-role", inside);
     historicalEvent.setStudentParticipant(null);
     events.save(historicalEvent);
-    assertThat(report().at("/structures/0/status").asText()).isEqualTo("SUPPRESSED");
+    assertThat(report().get("status").asText()).isEqualTo("SUPPRESSED");
     events.save(event(6, "pila", "fifth-student", inside));
-    assertThat(report().at("/structures/0/frequency").asLong()).isEqualTo(5);
+    JsonNode report = report();
+    assertThat(report.get("status").asText()).isEqualTo("AVAILABLE");
+    assertThat(report.get("activeStudents").asInt()).isEqualTo(5);
+    assertThat(report.at("/structures/0/frequency").asLong()).isEqualTo(5);
   }
 
   @Test
   void onePersonCannotSatisfyThresholdByGeneratingManyEvents() throws Exception {
     generations("pila", 1, 100);
     JsonNode report = report();
-    assertThat(report.at("/structures/0/status").asText()).isEqualTo("SUPPRESSED");
-    assertThat(report.at("/structures/0/frequency").isNull()).isTrue();
+    assertThat(report.get("status").asText()).isEqualTo("SUPPRESSED");
+    assertThat(report.get("structures")).isEmpty();
     assertThat(report.get("totalRequests").isNull()).isTrue();
   }
 
   @Test
   void fifthParticipantEnablesMetricAndCsvUsesSameSuppression() throws Exception {
     generations("pila", 4, 1);
-    generations("arbol_avl", 5, 1);
     String csv =
         mockMvc
             .perform(get(url("report.csv")).header("Authorization", "Bearer " + teacher))
@@ -235,9 +237,15 @@ class PedagogicalAnalyticsTest extends IntegrationTestSupport {
     assertThat(csv)
         .contains("Datos insuficientes para garantizar el anonimato")
         .doesNotContain("participant-", "session_id");
-    assertThat(report().at("/structures/0/percentage").isNull()).isTrue();
+    assertThat(report().get("structures")).isEmpty();
     events.save(event(4, "pila", "s-4", inside));
-    assertThat(report().at("/structures/0/percentage").asDouble()).isEqualTo(50.0);
+    // HU-36 · CA-5: con cinco activos en el grupo, una fila de pocos estudiantes también se ve.
+    events.save(event(4, "arbol_avl", "s-4", inside));
+    JsonNode report = report();
+    assertThat(report.at("/structures/0/structure").asText()).isEqualTo("pila");
+    assertThat(report.at("/structures/1/frequency").asLong()).isEqualTo(1);
+    assertThat(report.at("/structures/0/percentage").asDouble())
+        .isCloseTo(100.0 * 5 / 6, within(.00001));
   }
 
   @Test

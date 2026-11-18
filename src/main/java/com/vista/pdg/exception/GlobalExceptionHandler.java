@@ -46,6 +46,14 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(ex.status()).body(ApiError.of(ex.code(), ex.getMessage()));
   }
 
+  /** HU-36: archivos de material por encima del límite de multipart. */
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  public ResponseEntity<ApiError> handleUploadSize(Exception ex) {
+    String message = "El archivo supera el máximo de 10 MB";
+    return ResponseEntity.status(413)
+        .body(ApiError.field("FILE_TOO_LARGE", message, Map.of("file", message)));
+  }
+
   @ExceptionHandler(com.vista.pdg.quiz.service.QuizException.class)
   public ResponseEntity<ApiError> handleQuiz(com.vista.pdg.quiz.service.QuizException ex) {
     ApiError body =

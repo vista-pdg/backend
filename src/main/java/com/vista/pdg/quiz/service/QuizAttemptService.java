@@ -214,6 +214,13 @@ public class QuizAttemptService {
 
   @Transactional(noRollbackFor = QuizException.class)
   public AttemptDto answer(User actor, Long quizId, int position, Integer selectedOption) {
+    return answer(actor, quizId, position, selectedOption, null);
+  }
+
+  /** HU-36: {@code elapsedMs} es el tiempo visible acumulado; no puede superar el del intento. */
+  @Transactional(noRollbackFor = QuizException.class)
+  public AttemptDto answer(
+      User actor, Long quizId, int position, Integer selectedOption, Long elapsedMs) {
     QuizAttempt attempt = requireAttempt(actor, quizId);
     Instant now = now();
     requireOpen(attempt, now);
@@ -225,6 +232,12 @@ public class QuizAttemptService {
     // El cliente habla en el orden barajado; se guarda el índice original de la pregunta.
     item.setSelectedOption(selectedOption == null ? null : item.order().get(selectedOption));
     item.setAnsweredAt(now);
+    if (selectedOption != null && elapsedMs != null) {
+      long bound = Math.max(0, Duration.between(attempt.getStartedAt(), now).toMillis());
+      int spent = (int) Math.min(Math.min(elapsedMs, bound), Integer.MAX_VALUE);
+      item.setTimeSpentMs(
+          item.getTimeSpentMs() == null ? spent : Math.max(item.getTimeSpentMs(), spent));
+    }
     items.save(item);
     return dto(attempt, now);
   }

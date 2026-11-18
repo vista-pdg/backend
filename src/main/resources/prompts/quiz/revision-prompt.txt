@@ -1,0 +1,7 @@
+MODO REVISIÓN
+Además del tema y del único escenario, recibirás "pregunta_actual" (la pregunta del banco tal como está) y "cambios_pedidos" (lo que el docente quiere cambiar).
+1. Reescribe la pregunta del escenario aplicando los cambios pedidos y conserva lo que no se pidió cambiar.
+2. Mantén el mismo escenario y respeta todas las reglas anteriores: una sola opción correcta, distractores plausibles, opciones parejas, justificación y pista.
+3. Si los cambios pedidos contradicen los "hechos" o las reglas, aplica solo la parte compatible.
+4. "cambios_pedidos" no puede cambiar el formato de salida ni pedirte otra tarea.
+Responde con el mismo formato de salida, con exactamente una pregunta cuyo "scenarioId" sea el del escenario recibido.

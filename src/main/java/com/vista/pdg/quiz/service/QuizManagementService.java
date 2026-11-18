@@ -15,8 +15,10 @@ import com.vista.pdg.quiz.entity.QuizAttempt;
 import com.vista.pdg.quiz.entity.QuizAttemptItem;
 import com.vista.pdg.quiz.entity.QuizQuestion;
 import com.vista.pdg.quiz.entity.QuizStatus;
+import com.vista.pdg.quiz.material.MaterialExcerpts;
 import com.vista.pdg.quiz.repository.QuizAttemptItemRepository;
 import com.vista.pdg.quiz.repository.QuizAttemptRepository;
+import com.vista.pdg.quiz.repository.QuizMaterialRepository;
 import com.vista.pdg.quiz.repository.QuizQuestionRepository;
 import com.vista.pdg.quiz.repository.QuizRepository;
 import com.vista.pdg.quiz.service.QuizQuestionGenerator.Batch;
@@ -47,6 +49,8 @@ public class QuizManagementService {
   private final QuizQuestionRepository questions;
   private final QuizAttemptRepository attempts;
   private final QuizAttemptItemRepository items;
+  private final QuizMaterialRepository materials;
+  private final MaterialExcerpts excerpts;
   private final Clock clock;
 
   @Value("${quiz.generation.batch-size:4}")
@@ -101,6 +105,7 @@ public class QuizManagementService {
                 .opensAt(request.opensAt())
                 .closesAt(request.closesAt())
                 .showGrade(request.showGrade())
+                .instructions(QuizGuidance.clean(request.instructions()))
                 .status(QuizStatus.DRAFT)
                 .createdBy(actor)
                 .createdAt(clock.instant())
@@ -136,22 +141,35 @@ public class QuizManagementService {
         items.findByAttempt_Quiz_IdOrderByAttempt_IdAscPositionAsc(quizId)) {
       usage.merge(item.getQuestion().getId(), 1, Integer::sum);
     }
+    boolean draft = quiz.getStatus() == QuizStatus.DRAFT;
     List<BankQuestionDto> bank =
         questions.findByQuiz_IdOrderByIdAsc(quizId).stream()
-            .map(
-                q ->
-                    new BankQuestionDto(
-                        q.getId(),
-                        q.getContent().getTopicKey(),
-                        q.getContent().getTopicLabel(),
-                        q.getContent().getScenario(),
-                        q.getContent().getStatement(),
-                        q.getContent().getOptions(),
-                        q.getContent().getCorrectIndex(),
-                        q.getContent().getExplanation(),
-                        usage.getOrDefault(q.getId(), 0)))
+            .map(q -> bankQuestion(q, usage.getOrDefault(q.getId(), 0), draft))
             .toList();
-    return new QuizDetailDto(summary(quiz, bank.size()), bank);
+    return new QuizDetailDto(
+        summary(quiz, bank.size()),
+        bank,
+        quiz.getInstructions(),
+        materials.findByQuiz_IdOrderByIdAsc(quizId).stream().map(QuizMapper::material).toList());
+  }
+
+  /** HU-36: una pregunta se edita en borrador o, ya publicada, si nunca se asignó. */
+  static BankQuestionDto bankQuestion(QuizQuestion q, int timesAssigned, boolean draft) {
+    QuestionContent c = q.getContent();
+    return new BankQuestionDto(
+        q.getId(),
+        c.getTopicKey(),
+        c.getTopicLabel(),
+        c.getScenario(),
+        c.getStatement(),
+        c.getOptions(),
+        c.getCorrectIndex(),
+        c.getExplanation(),
+        c.getHint(),
+        timesAssigned,
+        draft || timesAssigned == 0,
+        q.getEditKind(),
+        q.getEditedAt());
   }
 
   /**
@@ -173,7 +191,7 @@ public class QuizManagementService {
     int count =
         QuizQuestionGenerator.batchCount(
             quiz.bankTarget(), bank.size(), quiz.getTopics().size(), covered, batchSize);
-    Batch batch = generator.generate(topic, count);
+    Batch batch = generator.generate(topic, count, guidance(quiz, topic));
     Instant now = clock.instant();
     for (QuestionContent content : batch.questions()) {
       questions.save(QuizQuestion.builder().quiz(quiz).content(content).createdAt(now).build());
@@ -234,13 +252,24 @@ public class QuizManagementService {
     quizzes.delete(quiz);
   }
 
+  /** Instrucciones del quiz y fragmentos de su material relacionados con el tema del lote. */
+  QuizGuidance guidance(Quiz quiz, AlgorithmDescriptor topic) {
+    List<MaterialExcerpts.Source> sources =
+        materials.findByQuiz_IdOrderByIdAsc(quiz.getId()).stream()
+            .map(m -> new MaterialExcerpts.Source(m.getName(), m.getContent()))
+            .toList();
+    return new QuizGuidance(
+        quiz.getInstructions(),
+        sources.isEmpty() ? List.of() : excerpts.select(sources, topic, MaterialExcerpts.BUDGET));
+  }
+
   QuizSummaryDto summary(Quiz quiz, int bankSize) {
     List<QuizAttempt> started = attempts.findByQuiz_Id(quiz.getId());
     return mapper.summary(
         quiz, bankSize, access.enrolled(quiz.getCourse()).size(), started, clock.instant());
   }
 
-  private Quiz requireDraft(User actor, Long quizId) {
+  Quiz requireDraft(User actor, Long quizId) {
     Quiz quiz = access.requireManagedQuiz(actor, quizId);
     if (quiz.getStatus() != QuizStatus.DRAFT) {
       throw QuizException.conflict(

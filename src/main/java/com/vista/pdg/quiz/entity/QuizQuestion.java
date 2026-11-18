@@ -28,4 +28,11 @@ public class QuizQuestion {
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
+
+  /** HU-36: {@code MANUAL} o {@code AI}; nulo si la pregunta sigue como la generó VISTA. */
+  @Column(name = "edit_kind", length = 16)
+  private String editKind;
+
+  @Column(name = "edited_at")
+  private Instant editedAt;
 }

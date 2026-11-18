@@ -1,15 +1,25 @@
 package com.vista.pdg.quiz.controller;
 
 import com.vista.pdg.auth.entity.User;
+import com.vista.pdg.quiz.dto.QuizDtos.AiProposalDto;
+import com.vista.pdg.quiz.dto.QuizDtos.AiProposalRequest;
+import com.vista.pdg.quiz.dto.QuizDtos.BankQuestionDto;
 import com.vista.pdg.quiz.dto.QuizDtos.CreateQuizRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.GenerateBatchResponse;
 import com.vista.pdg.quiz.dto.QuizDtos.GradeVisibilityRequest;
+import com.vista.pdg.quiz.dto.QuizDtos.GuidanceDto;
+import com.vista.pdg.quiz.dto.QuizDtos.GuidanceRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.ManagedCourseDto;
+import com.vista.pdg.quiz.dto.QuizDtos.MaterialDto;
+import com.vista.pdg.quiz.dto.QuizDtos.MaterialLinkRequest;
+import com.vista.pdg.quiz.dto.QuizDtos.QuestionEditRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizDetailDto;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizResultsDto;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizSummaryDto;
 import com.vista.pdg.quiz.dto.QuizDtos.TopicDto;
+import com.vista.pdg.quiz.service.QuizBankEditor;
 import com.vista.pdg.quiz.service.QuizManagementService;
+import com.vista.pdg.quiz.service.QuizMaterialService;
 import com.vista.pdg.quiz.service.QuizReportWriter;
 import com.vista.pdg.quiz.service.QuizResultsService;
 import jakarta.validation.Valid;
@@ -23,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Gestión docente de quizzes (HU-34). SecurityConfig exige TEACHER o ADMIN; el curso, el servicio.
@@ -36,6 +47,8 @@ public class QuizManagementController {
 
   private final QuizManagementService management;
   private final QuizResultsService results;
+  private final QuizMaterialService materials;
+  private final QuizBankEditor editor;
   private final Clock clock;
 
   @GetMapping("/courses")
@@ -85,6 +98,66 @@ public class QuizManagementController {
       @PathVariable Long quizId,
       @PathVariable Long questionId) {
     management.deleteQuestion(actor, quizId, questionId);
+  }
+
+  // ── HU-36: instrucciones, material y edición del banco ──────────────────
+
+  @GetMapping("/{quizId}/guidance")
+  public GuidanceDto guidance(@AuthenticationPrincipal User actor, @PathVariable Long quizId) {
+    return materials.guidance(actor, quizId);
+  }
+
+  @PutMapping("/{quizId}/guidance")
+  public GuidanceDto updateGuidance(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @Valid @RequestBody GuidanceRequest request) {
+    return materials.updateInstructions(actor, quizId, request.instructions());
+  }
+
+  @PostMapping("/{quizId}/materials/link")
+  @ResponseStatus(HttpStatus.CREATED)
+  public MaterialDto addLink(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @Valid @RequestBody MaterialLinkRequest request) {
+    return materials.addLink(actor, quizId, request);
+  }
+
+  @PostMapping(path = "/{quizId}/materials/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @ResponseStatus(HttpStatus.CREATED)
+  public MaterialDto addFile(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @RequestParam("file") MultipartFile file) {
+    return materials.addFile(actor, quizId, file);
+  }
+
+  @DeleteMapping("/{quizId}/materials/{materialId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteMaterial(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @PathVariable Long materialId) {
+    materials.delete(actor, quizId, materialId);
+  }
+
+  @PutMapping("/{quizId}/questions/{questionId}")
+  public BankQuestionDto updateQuestion(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @PathVariable Long questionId,
+      @Valid @RequestBody QuestionEditRequest request) {
+    return editor.update(actor, quizId, questionId, request);
+  }
+
+  @PostMapping("/{quizId}/questions/{questionId}/ai-proposal")
+  public AiProposalDto propose(
+      @AuthenticationPrincipal User actor,
+      @PathVariable Long quizId,
+      @PathVariable Long questionId,
+      @Valid @RequestBody AiProposalRequest request) {
+    return editor.propose(actor, quizId, questionId, request.instruction());
   }
 
   @PostMapping("/{quizId}/publish")

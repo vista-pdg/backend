@@ -113,6 +113,17 @@
 			<artifactId>spring-boot-starter-tomcat</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<!-- HU-36: texto del material de referencia de los quizzes (PDF y páginas web) -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.21.2</version>
+		</dependency>
 		<!-- HU-32: sesión de trabajo del asistente (memoria corta con TTL) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

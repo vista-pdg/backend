@@ -62,7 +62,12 @@ public final class StudyQuizDtos {
       @NotNull(message = "Elige una opción")
           @Min(value = 0, message = "Opción inválida")
           @Max(value = 3, message = "Opción inválida")
-          Integer selectedOption) {}
+          Integer selectedOption,
+      @Min(value = 0, message = "Tiempo inválido") Long elapsedMs) {
+    public StudyAnswerRequest(Integer selectedOption) {
+      this(selectedOption, null);
+    }
+  }
 
   /** Turno previo de la conversación con el tutor; la conversación vive en el navegador. */
   public record TutorTurn(
