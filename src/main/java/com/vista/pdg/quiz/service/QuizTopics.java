@@ -10,19 +10,30 @@ import org.springframework.stereotype.Component;
 
 /**
  * Temas de quiz: son las entradas del catálogo de algoritmos de VISTA, así que un algoritmo nuevo
- * queda disponible para evaluar sin tocar este módulo.
+ * queda disponible para evaluar sin tocar este módulo, siempre que VISTA pueda reproducirlo.
  */
 @Component
 @RequiredArgsConstructor
 public class QuizTopics {
   private final AlgorithmDispatcher dispatcher;
+  private final QuizScenarioFactory scenarios;
 
+  /** Temas que se pueden evaluar: los del catálogo que VISTA reproduce (HU-35 · CA-2). */
   public List<TopicDto> all() {
-    return dispatcher.catalog().stream().map(QuizTopics::toDto).toList();
+    return dispatcher.catalog().stream()
+        .filter(scenarios::supports)
+        .map(QuizTopics::toDto)
+        .toList();
   }
 
+  /** Cualquier entrada del catálogo, incluso las que ya no se ofrecen; sirve para leer quizzes. */
   public Optional<AlgorithmDescriptor> find(String key) {
     return dispatcher.catalog().stream().filter(d -> d.key().equals(key)).findFirst();
+  }
+
+  /** Un tema con el que todavía se pueden generar preguntas. */
+  public Optional<AlgorithmDescriptor> available(String key) {
+    return find(key).filter(scenarios::supports);
   }
 
   public static TopicDto toDto(AlgorithmDescriptor d) {

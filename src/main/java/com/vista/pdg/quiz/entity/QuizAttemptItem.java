@@ -53,6 +53,6 @@ public class QuizAttemptItem {
   }
 
   public boolean correct() {
-    return selectedOption != null && selectedOption == question.getCorrectIndex();
+    return selectedOption != null && selectedOption == question.getContent().getCorrectIndex();
   }
 }

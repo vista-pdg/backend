@@ -68,6 +68,10 @@ public class StubLlmAdapter implements LlmAdapter {
 
   private static final Pattern DIRECTED = Pattern.compile("\\b(dirigido|directed)\\b");
 
+  /** HU-35: «A-B peso 3», el formato de las instrucciones que los quizzes insertan en el chat. */
+  private static final Pattern WEIGHTED_EDGE =
+      Pattern.compile("\\b([A-Z])-([A-Z]) peso (\\d{1,3})\\b");
+
   /**
    * HU-21 · CA-3: estructuras que el syllabus no cubre. El modelo real acabaría agotando los
    * intentos o produciendo un contrato que el validador rechaza; el stub lo resuelve de una vez y
@@ -119,7 +123,8 @@ public class StubLlmAdapter implements LlmAdapter {
 
   /** Nombrar otra familia es empezar de cero, aunque haya sesión. */
   private static boolean describesNewStructure(String lower) {
-    return STACK.matcher(lower).find()
+    return lower.contains("desde cero")
+        || STACK.matcher(lower).find()
         || QUEUE.matcher(lower).find()
         || TREE.matcher(lower).find()
         || SIZE.matcher(lower).find();
@@ -179,7 +184,7 @@ public class StubLlmAdapter implements LlmAdapter {
     }
     // HU-32: «árbol con inserción de 1, 2, 3» — el stub también cubre la familia de árboles.
     if (TREE.matcher(lower).find()) {
-      String subtype = lower.contains("avl") ? "avl" : "bst";
+      String subtype = lower.contains("avl") ? "avl" : lower.contains("heap") ? "heap" : "bst";
       List<Integer> values = listedValues(lower, List.of(10, 5, 15));
       return new TreeContract(
           "tree", null, subtype, List.of(new TreeContract.Operation("insert", values)), null);
@@ -191,6 +196,8 @@ public class StubLlmAdapter implements LlmAdapter {
     if (QUEUE.matcher(lower).find()) {
       return new QueueContract("queue", null, listedValues(lower, List.of(5, 9, 1, 14)));
     }
+    GraphContract weighted = weightedGraph(userPrompt == null ? "" : userPrompt);
+    if (weighted != null) return weighted;
     int n = requestedSize(userPrompt);
     if (n <= 3) {
       return new GraphContract(
@@ -222,6 +229,33 @@ public class StubLlmAdapter implements LlmAdapter {
         false,
         labels,
         new GraphContract.MatrixDef("adjacency", matrix, null));
+  }
+
+  /** Grafo no dirigido y ponderado con las aristas «A-B peso 3» que liste la instrucción. */
+  private static GraphContract weightedGraph(String prompt) {
+    Matcher m = WEIGHTED_EDGE.matcher(prompt);
+    java.util.TreeSet<String> labels = new java.util.TreeSet<>();
+    List<String[]> edges = new ArrayList<>();
+    while (m.find()) {
+      labels.add(m.group(1));
+      labels.add(m.group(2));
+      edges.add(new String[] {m.group(1), m.group(2), m.group(3)});
+    }
+    if (edges.isEmpty()) return null;
+    List<String> order = new ArrayList<>(labels);
+    List<List<Integer>> matrix = new ArrayList<>();
+    for (int i = 0; i < order.size(); i++) {
+      matrix.add(new ArrayList<>(java.util.Collections.nCopies(order.size(), 0)));
+    }
+    for (String[] e : edges) {
+      int a = order.indexOf(e[0]);
+      int b = order.indexOf(e[1]);
+      int w = Integer.parseInt(e[2]);
+      matrix.get(a).set(b, w);
+      matrix.get(b).set(a, w);
+    }
+    return new GraphContract(
+        "graph", null, false, true, order, new GraphContract.MatrixDef("adjacency", matrix, null));
   }
 
   private static List<Integer> listedValues(String prompt, List<Integer> fallback) {

@@ -19,6 +19,10 @@ REGLAS DE LAS OPCIONES
 4. Prohibido: «todas las anteriores», «ninguna de las anteriores», «A y B», opciones absurdas, bromas o negaciones evidentes de la teoría. Tampoco distractores sobre bucles infinitos, errores del visualizador o fallos del programa: todos deben describir un comportamiento que el algoritmo podría tener.
 5. Varía la posición de la opción correcta entre preguntas.
 
+JUSTIFICACIÓN Y PISTA
+1. "explanation" explica por qué la correcta lo es y qué error representa cada distractor. Cita las opciones por su contenido, nunca por letra o posición: el orden se baraja.
+2. "hint" orienta sin revelar la respuesta ni descartar opciones: señala qué observar en VISTA (qué paso, qué variable, qué invariante) o qué concepto repasar. Máximo 200 caracteres.
+
 FORMATO DE SALIDA
 Responde SOLO con JSON válido, sin texto adicional y en español:
-{"questions":[{"scenarioId":1,"statement":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"por qué la correcta lo es y qué error representa cada distractor"}]}
+{"questions":[{"scenarioId":1,"statement":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"por qué la correcta lo es y qué error representa cada distractor","hint":"qué observar en VISTA sin revelar la respuesta"}]}

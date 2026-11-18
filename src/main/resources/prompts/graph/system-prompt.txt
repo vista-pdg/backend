@@ -34,6 +34,10 @@ CONVERSATION CONTEXT
   operation, in order, instead of replacing them.
 - When the new instruction describes a different structure ("ahora una pila con 3, 42, 8"), ignore
   the current structure entirely and build the new one from scratch.
+- When the new instruction says to start over ("desde cero", "nuevo", "from scratch"), ignore the
+  current structure entirely and build exactly what the instruction lists, even if it is the same
+  type: "Construye desde cero un árbol AVL insertando, en este orden, los valores 41, 20, 65" is a
+  new AVL with only those three values.
 - Never mention the context, the previous turns or the fact that you are updating something.
 
 SCHEMAS (required fields marked with *)

@@ -32,8 +32,8 @@ class QuizQuestionWriterTest {
           "values");
   private static final List<Scenario> SCENARIOS =
       List.of(
-          new Scenario(1, "Valores: [3, 2, 1]", List.of("Rotación simple a la derecha")),
-          new Scenario(2, "Valores: [1, 2, 3]", List.of()));
+          new Scenario(1, "Valores: [3, 2, 1]", List.of("Rotación simple a la derecha"), null),
+          new Scenario(2, "Valores: [1, 2, 3]", List.of(), null));
   private static final String STATEMENT =
       "¿Qué explica la rotación que se observa al terminar las inserciones del escenario?";
 

@@ -4,10 +4,13 @@ import com.vista.pdg.academic.entity.Course;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.quiz.dto.QuizDtos.AttemptDto;
 import com.vista.pdg.quiz.dto.QuizDtos.AttemptQuestionDto;
+import com.vista.pdg.quiz.dto.QuizDtos.AttemptReviewDto;
 import com.vista.pdg.quiz.dto.QuizDtos.IntegrityEventResponse;
+import com.vista.pdg.quiz.dto.QuizDtos.ReviewQuestionDto;
 import com.vista.pdg.quiz.dto.QuizDtos.StudentQuizDto;
 import com.vista.pdg.quiz.dto.QuizDtos.StudentQuizListDto;
 import com.vista.pdg.quiz.entity.AttemptStatus;
+import com.vista.pdg.quiz.entity.QuestionContent;
 import com.vista.pdg.quiz.entity.Quiz;
 import com.vista.pdg.quiz.entity.QuizAttempt;
 import com.vista.pdg.quiz.entity.QuizAttemptItem;
@@ -115,7 +118,8 @@ public class QuizAttemptService {
         quiz.getClosesAt(),
         state,
         attempt != null && !attempt.finished() ? attempt.getDeadline() : null,
-        attempt == null ? null : QuizMapper.result(attempt));
+        attempt == null ? null : QuizMapper.result(attempt),
+        attempt != null && reviewOpen(attempt, now));
   }
 
   /**
@@ -191,11 +195,11 @@ public class QuizAttemptService {
           bank.stream()
               .min(
                   Comparator.comparingInt((QuizQuestion q) -> usage.getOrDefault(q.getId(), 0))
-                      .thenComparing(q -> seenTopics.contains(q.getTopicKey())))
+                      .thenComparing(q -> seenTopics.contains(q.getContent().getTopicKey())))
               .orElseThrow();
       bank.remove(next);
       chosen.add(next);
-      seenTopics.add(next.getTopicKey());
+      seenTopics.add(next.getContent().getTopicKey());
     }
     return chosen;
   }
@@ -322,7 +326,7 @@ public class QuizAttemptService {
   }
 
   private static AttemptQuestionDto question(QuizAttemptItem item) {
-    QuizQuestion q = item.getQuestion();
+    QuestionContent q = item.getQuestion().getContent();
     List<Integer> order = item.order();
     Integer selected = item.getSelectedOption();
     return new AttemptQuestionDto(
@@ -331,6 +335,67 @@ public class QuizAttemptService {
         q.getScenario(),
         q.getStatement(),
         order.stream().map(q.getOptions()::get).toList(),
-        selected == null ? null : order.indexOf(selected));
+        selected == null ? null : order.indexOf(selected),
+        q.getSetup());
+  }
+
+  /**
+   * Revisión de solo lectura (HU-35 · CA-4). El banco se comparte entre los estudiantes del curso:
+   * mostrar la opción correcta mientras otros todavía presentan el quiz filtraría respuestas, así
+   * que exige el quiz cerrado y la nota visible.
+   */
+  @Transactional
+  public AttemptReviewDto review(User actor, Long quizId) {
+    QuizAttempt attempt = requireAttempt(actor, quizId);
+    Instant now = now();
+    closeIfOverdue(attempt, now);
+    Quiz quiz = attempt.getQuiz();
+    if (!attempt.finished()) {
+      throw QuizException.conflict("ATTEMPT_OPEN", "Entrega el quiz antes de revisarlo");
+    }
+    if (!quiz.isShowGrade()) {
+      throw QuizException.conflict(
+          "REVIEW_HIDDEN", "La revisión se habilita cuando tu docente publique la nota");
+    }
+    if (now.isBefore(quiz.getClosesAt())) {
+      throw QuizException.conflict(
+          "REVIEW_NOT_YET", "La revisión se habilita cuando cierre el quiz");
+    }
+    List<ReviewQuestionDto> reviewed =
+        items.findByAttempt_IdOrderByPositionAsc(attempt.getId()).stream()
+            .map(QuizAttemptService::reviewed)
+            .toList();
+    return new AttemptReviewDto(
+        quiz.getId(),
+        quiz.getTitle(),
+        attempt.getStatus().name(),
+        attempt.getFinishedAt(),
+        attempt.getScore(),
+        attempt.getTotal(),
+        QuizMapper.grade(attempt.getScore(), attempt.getTotal()),
+        reviewed);
+  }
+
+  private static boolean reviewOpen(QuizAttempt attempt, Instant now) {
+    return attempt.finished()
+        && attempt.getQuiz().isShowGrade()
+        && !now.isBefore(attempt.getQuiz().getClosesAt());
+  }
+
+  private static ReviewQuestionDto reviewed(QuizAttemptItem item) {
+    QuestionContent q = item.getQuestion().getContent();
+    List<Integer> order = item.order();
+    Integer selected = item.getSelectedOption();
+    String outcome = selected == null ? "UNANSWERED" : item.correct() ? "CORRECT" : "INCORRECT";
+    return new ReviewQuestionDto(
+        item.getPosition(),
+        q.getTopicLabel(),
+        q.getScenario(),
+        q.getStatement(),
+        order.stream().map(q.getOptions()::get).toList(),
+        selected == null ? null : order.indexOf(selected),
+        order.indexOf(q.getCorrectIndex()),
+        outcome,
+        q.getExplanation());
   }
 }

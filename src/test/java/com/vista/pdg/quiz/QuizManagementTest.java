@@ -259,5 +259,21 @@ class QuizManagementTest extends QuizTestSupport {
     mockMvc
         .perform(authed(get("/api/quizzes/manage/courses"), admin))
         .andExpect(jsonPath("$[?(@.code=='" + foreign + "')]").isNotEmpty());
+    // HU-35 · CA-3: al retirar la asignación desde Administración, el docente pierde el curso.
+    Long teacherId = users.findByEmail(TEACHER_EMAIL).orElseThrow().getId();
+    mockMvc
+        .perform(
+            delete("/api/admin/courses/{code}/teachers/{id}", mine, teacherId)
+                .header("Authorization", admin))
+        .andExpect(status().isNoContent());
+    create(teacher, quizBody(mine, 2, 2)).andExpect(status().isForbidden());
+    mockMvc
+        .perform(authed(get("/api/quizzes/manage/{id}", myQuiz), teacher))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(authed(get("/api/quizzes/manage/courses"), teacher))
+        .andExpect(jsonPath("$[?(@.code=='" + mine + "')]").isEmpty());
+    // El administrador sigue gestionando el curso y su quiz.
+    create(admin, quizBody(mine, 2, 2)).andExpect(status().isCreated());
   }
 }

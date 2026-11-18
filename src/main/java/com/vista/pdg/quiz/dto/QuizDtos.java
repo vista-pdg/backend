@@ -1,5 +1,6 @@
 package com.vista.pdg.quiz.dto;
 
+import com.vista.pdg.quiz.entity.VistaSetup;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -128,20 +129,50 @@ public final class QuizDtos {
       Instant closesAt,
       String state,
       Instant deadline,
-      AttemptResultDto result) {}
+      AttemptResultDto result,
+      boolean reviewAvailable) {}
 
   /** {@code courseCode} nulo: la cuenta no está matriculada y no puede presentar quizzes. */
   public record StudentQuizListDto(
       String courseCode, String courseName, List<StudentQuizDto> quizzes) {}
 
-  /** Nunca incluye la opción correcta ni la justificación. */
+  /**
+   * Nunca incluye la opción correcta ni la justificación. {@code setup} (HU-35) dice cómo
+   * reproducir el escenario en VISTA; es nulo en preguntas anteriores.
+   */
   public record AttemptQuestionDto(
       int position,
       String topicLabel,
       String scenario,
       String statement,
       List<String> options,
-      Integer selectedOption) {}
+      Integer selectedOption,
+      VistaSetup setup) {}
+
+  /**
+   * Revisión de solo lectura (HU-35 · CA-4). Las opciones van en el orden en que el estudiante las
+   * vio; {@code outcome} es CORRECT, INCORRECT o UNANSWERED.
+   */
+  public record ReviewQuestionDto(
+      int position,
+      String topicLabel,
+      String scenario,
+      String statement,
+      List<String> options,
+      Integer selectedOption,
+      int correctOption,
+      String outcome,
+      String explanation) {}
+
+  public record AttemptReviewDto(
+      Long quizId,
+      String title,
+      String status,
+      Instant finishedAt,
+      Integer score,
+      int total,
+      Double grade,
+      List<ReviewQuestionDto> questions) {}
 
   public record AttemptDto(
       Long quizId,

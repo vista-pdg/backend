@@ -49,7 +49,8 @@ public class QuizQuestionWriter {
       String statement,
       List<String> options,
       int correctIndex,
-      String explanation) {}
+      String explanation,
+      String hint) {}
 
   public List<Draft> write(AlgorithmDescriptor topic, List<Scenario> scenarios) {
     String raw = llm.completeJson(systemPrompt(), userPrompt(topic, scenarios));
@@ -126,7 +127,8 @@ public class QuizQuestionWriter {
     if (options.get(correct).length() == longest && longest > secondLongest(options) * 2)
       return null;
     String explanation = node.path("explanation").asText("").strip();
-    return new Draft(scenario, statement, List.copyOf(options), correct, explanation);
+    String hint = node.path("hint").asText("").strip();
+    return new Draft(scenario, statement, List.copyOf(options), correct, explanation, hint);
   }
 
   private static int secondLongest(List<String> options) {

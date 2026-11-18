@@ -20,6 +20,23 @@ public final class QuizStubResponses {
   private QuizStubResponses() {}
 
   public static String forPrompt(String userPrompt) {
+    try {
+      JsonNode prompt = MAPPER.readTree(userPrompt);
+      // HU-35: el tutor de estudio responde siempre lo mismo, citando el tema y la pregunta.
+      if (prompt.has("pregunta_estudiante")) {
+        return MAPPER
+            .createObjectNode()
+            .put(
+                "reply",
+                "Tutor de prueba sobre «"
+                    + prompt.path("tema").asText("")
+                    + "»: observa el escenario en VISTA. Preguntaste: "
+                    + prompt.path("pregunta_estudiante").asText(""))
+            .toString();
+      }
+    } catch (Exception e) {
+      // Prompt ilegible: se trata como el del banco.
+    }
     ObjectNode root = MAPPER.createObjectNode();
     ArrayNode questions = root.putArray("questions");
     try {
@@ -43,6 +60,7 @@ public final class QuizStubResponses {
         }
         question.put("correctIndex", correctIndex(id));
         question.put("explanation", "Respuesta determinista del sustituto de pruebas.");
+        question.put("hint", "Observa en VISTA el paso en que cambia la estructura. [E" + id + "]");
       }
     } catch (Exception e) {
       // Prompt ilegible: banco vacío, igual que un modelo que no respeta el formato.

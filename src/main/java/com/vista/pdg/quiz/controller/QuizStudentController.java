@@ -3,6 +3,7 @@ package com.vista.pdg.quiz.controller;
 import com.vista.pdg.auth.entity.User;
 import com.vista.pdg.quiz.dto.QuizDtos.AnswerRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.AttemptDto;
+import com.vista.pdg.quiz.dto.QuizDtos.AttemptReviewDto;
 import com.vista.pdg.quiz.dto.QuizDtos.IntegrityEventRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.IntegrityEventResponse;
 import com.vista.pdg.quiz.dto.QuizDtos.StudentQuizListDto;
@@ -36,6 +37,13 @@ public class QuizStudentController {
   public ResponseEntity<AttemptDto> view(
       @AuthenticationPrincipal User actor, @PathVariable Long quizId) {
     return noStore(attempts.view(actor, quizId));
+  }
+
+  /** HU-35 · CA-4: revisión de solo lectura del intento entregado. */
+  @GetMapping("/{quizId}/attempt/review")
+  public ResponseEntity<AttemptReviewDto> review(
+      @AuthenticationPrincipal User actor, @PathVariable Long quizId) {
+    return noStore(attempts.review(actor, quizId));
   }
 
   @PutMapping("/{quizId}/attempt/answers/{position}")

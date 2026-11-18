@@ -2,8 +2,6 @@ package com.vista.pdg.quiz.service;
 
 import com.vista.pdg.academic.entity.Course;
 import com.vista.pdg.auth.entity.User;
-import com.vista.pdg.exception.LlmExhaustedException;
-import com.vista.pdg.exception.LlmUnavailableException;
 import com.vista.pdg.quiz.dto.QuizDtos.BankQuestionDto;
 import com.vista.pdg.quiz.dto.QuizDtos.CreateQuizRequest;
 import com.vista.pdg.quiz.dto.QuizDtos.GenerateBatchResponse;
@@ -11,6 +9,7 @@ import com.vista.pdg.quiz.dto.QuizDtos.ManagedCourseDto;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizDetailDto;
 import com.vista.pdg.quiz.dto.QuizDtos.QuizSummaryDto;
 import com.vista.pdg.quiz.dto.QuizDtos.TopicDto;
+import com.vista.pdg.quiz.entity.QuestionContent;
 import com.vista.pdg.quiz.entity.Quiz;
 import com.vista.pdg.quiz.entity.QuizAttempt;
 import com.vista.pdg.quiz.entity.QuizAttemptItem;
@@ -20,19 +19,15 @@ import com.vista.pdg.quiz.repository.QuizAttemptItemRepository;
 import com.vista.pdg.quiz.repository.QuizAttemptRepository;
 import com.vista.pdg.quiz.repository.QuizQuestionRepository;
 import com.vista.pdg.quiz.repository.QuizRepository;
-import com.vista.pdg.quiz.service.QuizQuestionWriter.Draft;
-import com.vista.pdg.quiz.service.QuizScenarioFactory.Scenario;
+import com.vista.pdg.quiz.service.QuizQuestionGenerator.Batch;
 import com.vista.pdg.service.algorithm.def.AlgorithmDescriptor;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -47,14 +42,12 @@ public class QuizManagementService {
   private final QuizAccess access;
   private final QuizTopics topics;
   private final QuizMapper mapper;
-  private final QuizScenarioFactory scenarios;
-  private final QuizQuestionWriter writer;
+  private final QuizQuestionGenerator generator;
   private final QuizRepository quizzes;
   private final QuizQuestionRepository questions;
   private final QuizAttemptRepository attempts;
   private final QuizAttemptItemRepository items;
   private final Clock clock;
-  private final Random random = new SecureRandom();
 
   @Value("${quiz.generation.batch-size:4}")
   private int batchSize;
@@ -77,7 +70,7 @@ public class QuizManagementService {
   public QuizSummaryDto create(User actor, CreateQuizRequest request) {
     Course course = access.requireManagedCourse(actor, request.courseCode());
     List<String> selected = new ArrayList<>(new LinkedHashSet<>(request.topics()));
-    if (selected.stream().anyMatch(key -> topics.find(key).isEmpty())) {
+    if (selected.stream().anyMatch(key -> topics.available(key).isEmpty())) {
       throw QuizException.invalid("topics", "Uno de los temas ya no está en el catálogo de VISTA");
     }
     if (!request.closesAt().isAfter(request.opensAt())) {
@@ -149,13 +142,13 @@ public class QuizManagementService {
                 q ->
                     new BankQuestionDto(
                         q.getId(),
-                        q.getTopicKey(),
-                        q.getTopicLabel(),
-                        q.getScenario(),
-                        q.getStatement(),
-                        q.getOptions(),
-                        q.getCorrectIndex(),
-                        q.getExplanation(),
+                        q.getContent().getTopicKey(),
+                        q.getContent().getTopicLabel(),
+                        q.getContent().getScenario(),
+                        q.getContent().getStatement(),
+                        q.getContent().getOptions(),
+                        q.getContent().getCorrectIndex(),
+                        q.getContent().getExplanation(),
                         usage.getOrDefault(q.getId(), 0)))
             .toList();
     return new QuizDetailDto(summary(quiz, bank.size()), bank);
@@ -172,55 +165,26 @@ public class QuizManagementService {
     if (missing <= 0) {
       return new GenerateBatchResponse(0, 0, bank.size(), quiz.bankTarget(), true);
     }
-    AlgorithmDescriptor topic = leastCovered(quiz, bank);
-    // Cuota por tema: un lote no debe dejar a un tema con más de su parte del banco.
-    int quota = Math.ceilDiv(quiz.bankTarget(), quiz.getTopics().size());
-    long covered = bank.stream().filter(q -> q.getTopicKey().equals(topic.key())).count();
+    AlgorithmDescriptor topic =
+        generator.leastCovered(
+            quiz.getTopics(), bank.stream().map(q -> q.getContent().getTopicKey()).toList());
+    long covered =
+        bank.stream().filter(q -> q.getContent().getTopicKey().equals(topic.key())).count();
     int count =
-        Math.min(Math.min(Math.max(1, batchSize), missing), (int) Math.max(1, quota - covered));
-    List<Scenario> batch = new ArrayList<>();
-    for (int i = 1; i <= count; i++) batch.add(scenarios.build(topic, random, i));
-
-    List<Draft> drafts;
-    try {
-      drafts = writer.write(topic, batch);
-    } catch (LlmUnavailableException | LlmExhaustedException e) {
-      throw QuizException.unavailable(e.getMessage());
-    } catch (UnsupportedOperationException e) {
-      throw QuizException.unavailable("El modelo configurado no puede generar preguntas");
-    }
+        QuizQuestionGenerator.batchCount(
+            quiz.bankTarget(), bank.size(), quiz.getTopics().size(), covered, batchSize);
+    Batch batch = generator.generate(topic, count);
     Instant now = clock.instant();
-    for (Draft draft : drafts) {
-      questions.save(
-          QuizQuestion.builder()
-              .quiz(quiz)
-              .topicKey(topic.key())
-              .topicLabel(QuizTopics.label(topic))
-              .scenario(draft.scenario().description())
-              .statement(draft.statement())
-              .options(draft.options())
-              .correctIndex(draft.correctIndex())
-              .explanation(draft.explanation())
-              .createdAt(now)
-              .build());
+    for (QuestionContent content : batch.questions()) {
+      questions.save(QuizQuestion.builder().quiz(quiz).content(content).createdAt(now).build());
     }
-    int size = bank.size() + drafts.size();
+    int size = bank.size() + batch.questions().size();
     return new GenerateBatchResponse(
-        drafts.size(), count - drafts.size(), size, quiz.bankTarget(), size >= quiz.bankTarget());
-  }
-
-  /** El tema con menos preguntas en el banco: reparte el banco de forma pareja entre temas. */
-  private AlgorithmDescriptor leastCovered(Quiz quiz, List<QuizQuestion> bank) {
-    Map<String, Long> perTopic = new HashMap<>();
-    bank.forEach(q -> perTopic.merge(q.getTopicKey(), 1L, Long::sum));
-    return quiz.getTopics().stream()
-        .filter(key -> topics.find(key).isPresent())
-        .min(Comparator.comparingLong(key -> perTopic.getOrDefault(key, 0L)))
-        .flatMap(topics::find)
-        .orElseThrow(
-            () ->
-                QuizException.invalid(
-                    "topics", "Los temas de este quiz ya no están en el catálogo de VISTA"));
+        batch.questions().size(),
+        batch.discarded(),
+        size,
+        quiz.bankTarget(),
+        size >= quiz.bankTarget());
   }
 
   @Transactional

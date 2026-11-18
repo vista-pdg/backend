@@ -59,6 +59,19 @@ public class AssistantScopeService {
     }
   }
 
+  /**
+   * Texto libre que no es una estructura (el mensaje al tutor de HU-35): las mismas defensas contra
+   * escapes de rol, secretos y temas ajenos que el chat.
+   */
+  public boolean isOutOfBounds(String text) {
+    if (text == null) return false;
+    String normalized =
+        Normalizer.normalize(text, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "")
+            .toLowerCase(Locale.ROOT);
+    return ESCAPE.matcher(normalized).find() || OFF_TOPIC.matcher(normalized).find();
+  }
+
   private void validateSelection(String type, String subtype) {
     if (type == null) {
       if (subtype != null) reject("Selecciona la estructura antes de indicar un subtipo.");
