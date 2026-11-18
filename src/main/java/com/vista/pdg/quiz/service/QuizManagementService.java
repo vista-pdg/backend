@@ -31,11 +31,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Ciclo de vida de un quiz desde el lado docente: crear, poblar el banco, revisar y publicar. */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class QuizManagementService {
@@ -241,15 +243,32 @@ public class QuizManagementService {
     return summary(quizzes.save(quiz), (int) questions.countByQuiz_Id(quizId));
   }
 
+  /**
+   * Un docente solo elimina un quiz que nadie ha empezado. El administrador puede eliminarlo con
+   * entregas: se van también sus intentos y notas, y queda constancia en el log.
+   */
   @Transactional
   public void delete(User actor, Long quizId) {
     Quiz quiz = access.requireManagedQuiz(actor, quizId);
-    if (attempts.countByQuiz_Id(quizId) > 0) {
+    List<QuizAttempt> started = attempts.findByQuiz_Id(quizId);
+    if (!started.isEmpty() && !QuizAccess.hasRole(actor, "ADMIN")) {
       throw QuizException.conflict(
-          "QUIZ_HAS_ATTEMPTS", "Este quiz ya tiene intentos de estudiantes y no se puede eliminar");
+          "QUIZ_HAS_ATTEMPTS",
+          "Este quiz ya tiene intentos de estudiantes; solo un administrador puede eliminarlo");
     }
+    items.deleteAll(items.findByAttempt_Quiz_IdOrderByAttempt_IdAscPositionAsc(quizId));
+    attempts.deleteAll(started);
+    materials.deleteAll(materials.findByQuiz_IdOrderByIdAsc(quizId));
     questions.deleteAll(questions.findByQuiz_IdOrderByIdAsc(quizId));
     quizzes.delete(quiz);
+    if (!started.isEmpty()) {
+      log.info(
+          "Quiz {} del curso {} eliminado por el administrador {} con {} intentos",
+          quizId,
+          quiz.getCourse().getCode(),
+          actor.getId(),
+          started.size());
+    }
   }
 
   /** Instrucciones del quiz y fragmentos de su material relacionados con el tema del lote. */

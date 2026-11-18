@@ -348,10 +348,5 @@ class QuizAttemptTest extends QuizTestSupport {
     // Un cuarto estudiante agota el banco: recibe preguntas ya usadas en lugar de quedarse sin
     // quiz.
     assertThat(start(bearer(student(course, "qzuniq")), quiz).path("questions")).hasSize(2);
-
-    mockMvc
-        .perform(authed(delete("/api/quizzes/manage/{id}", quiz), admin))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("QUIZ_HAS_ATTEMPTS"));
   }
 }

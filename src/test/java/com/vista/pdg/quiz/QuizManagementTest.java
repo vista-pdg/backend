@@ -276,4 +276,40 @@ class QuizManagementTest extends QuizTestSupport {
     // El administrador sigue gestionando el curso y su quiz.
     create(admin, quizBody(mine, 2, 2)).andExpect(status().isCreated());
   }
+
+  @Test
+  void onlyAnAdministratorDeletesAQuizThatHasAttempts() throws Exception {
+    String course = newCourse();
+    assignTeacher(course);
+    String teacher = teacher();
+    String student = bearer(student(course, "qzdel"));
+    long quiz = publishedQuiz(teacher, quizBody(course, 1, 2));
+    JsonNode attempt = start(student, quiz);
+    answer(student, quiz, 1, 0).andExpect(status().isOk());
+    mockMvc
+        .perform(authed(post("/api/quizzes/{id}/attempt/submit", quiz), student))
+        .andExpect(status().isOk());
+    assertThat(attempt.path("questions")).hasSize(1);
+
+    mockMvc
+        .perform(authed(delete("/api/quizzes/manage/{id}", quiz), teacher))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("QUIZ_HAS_ATTEMPTS"))
+        .andExpect(
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("administrador")));
+
+    mockMvc
+        .perform(authed(delete("/api/quizzes/manage/{id}", quiz), admin()))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(authed(get("/api/quizzes/manage/{id}", quiz), admin()))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(authed(get("/api/quizzes"), student))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.quizzes.length()").value(0));
+    mockMvc
+        .perform(authed(get("/api/quizzes/{id}/attempt", quiz), student))
+        .andExpect(status().isNotFound());
+  }
 }
