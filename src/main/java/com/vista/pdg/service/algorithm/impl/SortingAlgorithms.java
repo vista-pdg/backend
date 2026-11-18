@@ -35,10 +35,11 @@ public final class SortingAlgorithms {
     }
 
     public StepsResponse generate(AlgorithmRequest r) {
-      Trace t = new Trace(CanvasTrace.values(r, 32));
+      Trace t =
+          CanvasSequenceInput.present(r) ? new Trace(r) : new Trace(CanvasTrace.values(r, 32));
       t.step(
           "Secuencia inicial",
-          "Se ordena una secuencia nueva; los IDs acompañan a cada valor.",
+          "Los IDs acompañan a cada valor; se usa el origen elegido.",
           "initial",
           1,
           List.of());
@@ -54,6 +55,37 @@ public final class SortingAlgorithms {
     final List<Node3D> items;
     final CanvasTrace canvas;
     int comparisons, swaps, writes;
+    boolean doubly, circular;
+
+    Trace(AlgorithmRequest r) {
+      canvas = new CanvasTrace(r);
+      items = CanvasSequenceInput.read(canvas, "list");
+      if (items.size() > 32)
+        throw new com.vista.pdg.exception.InvalidAlgorithmInputException(
+            "Usa hasta 32 elementos para ordenar.");
+      String subtype =
+          items.getFirst().properties() == null
+              ? ""
+              : Objects.toString(items.getFirst().properties().get("listSubtype"), "");
+      doubly =
+          subtype.equals("doubly")
+              || (subtype.isEmpty()
+                  && canvas.edges.stream()
+                      .anyMatch(
+                          e ->
+                              canvas.edges.stream()
+                                  .anyMatch(
+                                      b -> b.from().equals(e.to()) && b.to().equals(e.from()))));
+      circular =
+          subtype.equals("circular")
+              || (!doubly
+                  && canvas.edges.stream()
+                      .anyMatch(
+                          e ->
+                              e.from().equals(items.getLast().id())
+                                  && e.to().equals(items.getFirst().id())));
+      SequenceScene.validateListLinks(canvas, items, doubly, circular);
+    }
 
     Trace(List<Integer> values) {
       items = SequenceScene.fromValues(values);
@@ -66,7 +98,10 @@ public final class SortingAlgorithms {
     }
 
     void step(String title, String detail, String type, int line, List<Node3D> active) {
-      var s = SequenceScene.place(items, "list", false, false);
+      var s =
+          canvas.steps.isEmpty()
+              ? new SequenceScene.Scene(canvas.nodes, canvas.edges)
+              : SequenceScene.place(items, "list", doubly, circular);
       canvas.add(
           s.nodes(),
           s.edges(),

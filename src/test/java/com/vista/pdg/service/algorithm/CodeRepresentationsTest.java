@@ -102,7 +102,12 @@ class CodeRepresentationsTest {
 
   @Test
   void vistaJavaDownloadsCompileWithJava17WithoutApplicationDependencies() throws Exception {
-    for (var listing : List.of(AlgorithmCode.avl(), AlgorithmCode.bfs(), AlgorithmCode.inorder())) {
+    for (var listing :
+        List.of(
+            AlgorithmCode.avl(),
+            AlgorithmCode.avlOnCanvas(),
+            AlgorithmCode.bfs(),
+            AlgorithmCode.inorder())) {
       Path file = dir.resolve(listing.fileName());
       Files.writeString(file, String.join("\n", listing.code()));
       assertThat(

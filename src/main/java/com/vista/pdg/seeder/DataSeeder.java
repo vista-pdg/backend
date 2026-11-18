@@ -72,6 +72,8 @@ public class DataSeeder implements ApplicationRunner {
     // HU-16: periodo activo y curso de los antecedentes Gherkin.
     AcademicTerm term = ensureActiveTerm("2026-1");
     Course cedi = ensureCourse("CEDI-G1", "Computación y Estructuras Discretas I", term);
+    ensureCourse("CEDI-G3", "Computación y Estructuras Discretas I", term);
+    ensureCourse("CEDI-G5", "Computación y Estructuras Discretas I", term);
 
     ensureUser("admin@vista.com", "Administrador", "admin123", admin);
     ensureUser("docente@u.icesi.edu.co", "Docente Demo", "docente123", teacher);

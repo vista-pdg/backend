@@ -1,16 +1,27 @@
 package com.vista.pdg.service.llm.impl;
 
 import com.google.genai.Client;
+import com.google.genai.types.ClientOptions;
 import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.HttpOptions;
+import com.google.genai.types.HttpRetryOptions;
 import com.google.genai.types.Part;
 import com.vista.pdg.config.GeminiProperties;
+import com.vista.pdg.config.GeminiTransportProperties;
 import com.vista.pdg.exception.LlmUnavailableException;
 import com.vista.pdg.service.llm.def.AbstractLlmAdapter;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
+import jakarta.annotation.PreDestroy;
+import java.time.Duration;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import okhttp3.ConnectionPool;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,9 +31,21 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
 
   private final String model;
   private final Client client;
+  private final GeminiTransportProperties transport;
+  private final Semaphore slots;
 
   public GeminiLlmAdapter(GeminiProperties geminiProperties, ContractBuilder contractBuilder) {
+    this(geminiProperties, contractBuilder, GeminiTransportProperties.defaults());
+  }
+
+  @Autowired
+  public GeminiLlmAdapter(
+      GeminiProperties geminiProperties,
+      ContractBuilder contractBuilder,
+      GeminiTransportProperties transport) {
     super(contractBuilder);
+    this.transport = transport;
+    this.slots = new Semaphore(transport.maxConcurrentRequests(), true);
     GeminiProperties.Api api = geminiProperties.api();
     this.model = api.model();
     if (api.vertex()) {
@@ -38,19 +61,76 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
           api.project(),
           location);
       this.client =
-          Client.builder().vertexAI(true).project(api.project()).location(location).build();
+          Client.builder()
+              .vertexAI(true)
+              .project(api.project())
+              .location(location)
+              .httpOptions(httpOptions(transport.requestTimeoutMs()))
+              .clientOptions(clientOptions(transport))
+              .build();
     } else {
       String key = api.key() == null ? "" : api.key();
-      log.info(
-          "GeminiLlmAdapter init — AI Studio, model: {}, key: {}***{}",
-          model,
-          key.length() > 8 ? key.substring(0, 4) : "????",
-          key.length() > 8 ? key.substring(key.length() - 4) : "????");
-      this.client = Client.builder().apiKey(key).build();
+      log.info("GeminiLlmAdapter init — AI Studio, model: {}", model);
+      this.client =
+          Client.builder()
+              .apiKey(key)
+              .httpOptions(httpOptions(transport.requestTimeoutMs()))
+              .clientOptions(clientOptions(transport))
+              .build();
     }
   }
 
-  /** HU-34: misma llamada que la generación de contratos, sin pasar por el ContractBuilder. */
+  GeminiLlmAdapter(
+      String model, Client client, ContractBuilder builder, GeminiTransportProperties transport) {
+    super(builder);
+    this.model = model;
+    this.client = client;
+    this.transport = transport;
+    this.slots = new Semaphore(transport.maxConcurrentRequests(), true);
+  }
+
+  static HttpOptions httpOptions(int timeoutMs) {
+    // The application owns the shared three-attempt budget, including invalid JSON.
+    return HttpOptions.builder()
+        .apiVersion("v1")
+        .timeout(timeoutMs)
+        .retryOptions(HttpRetryOptions.builder().attempts(1).build())
+        .build();
+  }
+
+  static ClientOptions clientOptions(GeminiTransportProperties transport) {
+    // OkHttp may otherwise replay a failed connection outside the application's budget.
+    OkHttpClient httpClient =
+        new OkHttpClient.Builder()
+            .retryOnConnectionFailure(false)
+            // A single call timeout (set by HttpOptions) owns all network phases.
+            .connectTimeout(0, TimeUnit.MILLISECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .writeTimeout(0, TimeUnit.MILLISECONDS)
+            .connectionPool(
+                new ConnectionPool(transport.maxConcurrentRequests(), 5, TimeUnit.MINUTES))
+            .build();
+    return ClientOptions.builder()
+        .customHttpClient(httpClient)
+        .maxConnections(transport.maxConcurrentRequests())
+        .maxConnectionsPerHost(transport.maxConcurrentRequests())
+        .build();
+  }
+
+  @PreDestroy
+  public void close() {
+    client.close();
+  }
+
+  @Override
+  protected Duration generationTimeout() {
+    return Duration.ofMillis(transport.totalTimeoutMs());
+  }
+
+  /**
+   * HU-34: misma llamada que la generación de contratos (cola, semáforo y tiempos acotados), sin
+   * pasar por el ContractBuilder.
+   */
   @Override
   public String completeJson(String systemPrompt, String userPrompt) {
     return callModel(systemPrompt, userPrompt);
@@ -58,7 +138,44 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
 
   @Override
   protected String callModel(String systemPrompt, String userPrompt) {
-    log.debug("Calling Gemini model '{}' — prompt: {}", model, userPrompt);
+    return callModel(systemPrompt, userPrompt, generationTimeout());
+  }
+
+  @Override
+  protected String callModel(String systemPrompt, String userPrompt, Duration remaining) {
+    long started = System.nanoTime();
+    boolean acquired = false;
+    long queueMs = 0;
+    try {
+      // Dispatcher limits apply to async calls; the semaphore also bounds synchronous calls.
+      acquired =
+          slots.tryAcquire(
+              Math.min(transport.queueTimeoutMs(), Math.max(1, remaining.toMillis())),
+              TimeUnit.MILLISECONDS);
+      queueMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+      long availableMs = remaining.toMillis() - queueMs;
+      if (!acquired || availableMs <= 0) {
+        throw new LlmUnavailableException(
+            "El asistente está ocupado. Inténtalo de nuevo en unos segundos.", null, false);
+      }
+      return request(
+          systemPrompt, userPrompt, (int) Math.min(transport.requestTimeoutMs(), availableMs));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new LlmUnavailableException(
+          "La generación fue interrumpida. Inténtalo de nuevo.", e, false);
+    } finally {
+      if (acquired) slots.release();
+      log.info(
+          "Gemini request model={} queueMs={} elapsedMs={} active={}",
+          model,
+          queueMs,
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+          transport.maxConcurrentRequests() - slots.availablePermits());
+    }
+  }
+
+  private String request(String systemPrompt, String userPrompt, int timeoutMs) {
     try {
       // Salida JSON forzada y temperatura 0: el modelo no puede envolver la respuesta en prosa ni
       // en ``` y elige siempre la forma más probable. Lo que siga variando lo absorbe el
@@ -69,6 +186,7 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
               .responseMimeType("application/json")
               .temperature(0.0f)
               .candidateCount(1)
+              .httpOptions(httpOptions(timeoutMs))
               .build();
       GenerateContentResponse response = client.models.generateContent(model, userPrompt, config);
       String text = response.text();
@@ -80,10 +198,14 @@ public class GeminiLlmAdapter extends AbstractLlmAdapter {
     } catch (LlmUnavailableException e) {
       throw e;
     } catch (Exception e) {
+      if (e instanceof com.google.genai.errors.GenAiIOException) {
+        throw new LlmUnavailableException(
+            "No se pudo contactar al modelo. Inténtalo de nuevo en unos segundos.", e, true);
+      }
       String reason = unavailableReason(e);
       if (reason != null) {
         log.error("Gemini unavailable — model: {}, reason: {}", model, e.getMessage());
-        throw new LlmUnavailableException(reason, e);
+        throw new LlmUnavailableException(reason, e, reason.contains("(503)"));
       }
       log.error("Gemini call failed — model: {}, error: {}", model, e.getMessage(), e);
       throw e;

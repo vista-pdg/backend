@@ -185,6 +185,15 @@ representaciones Java descargables a estrategias que solamente tienen pseudocód
 
 ### Generación por el asistente: de texto libre a contrato fijo
 
+La configuración local y `.env.example` usan `gemini-3.5-flash-lite`, alineado con el valor por
+omisión y Terraform. Selección confirmada el 19-10-2026: es la opción Flash-Lite reciente
+recomendada por Google, aunque 3.1 Flash-Lite conserva un precio menor. Tarifas Standard de
+texto por millón de tokens, entrada/salida: 3.1 Flash-Lite US$0,25/1,50; 3.5 Flash-Lite
+US$0,30/2,50; 3.8 Flash US$0,75/3,75 (este último hasta el 31-12-2026).
+Consultar [precios](https://ai.google.dev/gemini-api/docs/pricing) y
+[ciclo de vida](https://ai.google.dev/gemini-api/docs/deprecations) antes de otra migración.
+Cambiar el modelo requiere reiniciar el backend; no cambiar claves ni credenciales.
+
 El modelo no es determinista, así que la cadena que lo rodea sí lo es:
 
 1. `GeminiLlmAdapter` pide **salida JSON** (`responseMimeType`) con **temperatura 0** y un prompt
@@ -193,8 +202,10 @@ El modelo no es determinista, así que la cadena que lo rodea sí lo es:
    sin `operations`, aristas en vez de matriz, números como texto…) al contrato estricto.
 3. `ContractValidator` rechaza lo que no se pueda normalizar y el adaptador reintenta (máx. 3) con el
    error como corrección.
-4. Los fallos del proveedor —créditos/cuota (429), clave (401/403), modelo (404), caída (503)— no se
-   reintentan: `LlmUnavailableException` → HTTP 503 con el motivo en el mensaje.
+4. Una sobrecarga o indisponibilidad temporal del proveedor (503) se reintenta conservando el prompt
+   y contexto, con esperas de 1 y 2 segundos dentro del mismo máximo de 3 intentos. Los fallos de
+   créditos/cuota (429), clave (401/403) o modelo (404) se devuelven inmediatamente.
+   `LlmUnavailableException` → HTTP 503 con el motivo en el mensaje si no se recupera.
 5. `LayoutDispatcher` garantiza una posición por nodo (bosques, aristas rotas, pistas de layout
    desconocidas): nada se dibuja encima del origen.
 

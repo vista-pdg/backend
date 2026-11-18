@@ -187,7 +187,9 @@ public class TreeGenerator implements StructureGenerator<TreeContract> {
     for (int i = 0; i < heap.size(); i++) {
       int depth = (int) (Math.log(i + 1) / Math.log(2));
       String pId = i > 0 ? "n" + ((i - 1) / 2) : null;
-      nodes.add(new Node3D("n" + i, String.valueOf(heap.get(i)), 0, 0, 0, depth, pId, Map.of()));
+      nodes.add(
+          new Node3D(
+              "n" + i, String.valueOf(heap.get(i)), 0, 0, 0, depth, pId, Map.of("index", i)));
       if (pId != null) edges.add(new Edge3D("e" + edges.size(), pId, "n" + i, null, true));
     }
     return new GeneratedStructure(contract, nodes, edges, Map.of());

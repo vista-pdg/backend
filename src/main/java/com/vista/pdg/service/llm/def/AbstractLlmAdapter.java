@@ -10,6 +10,7 @@ import com.vista.pdg.model.response.StructureResponse.AttemptDetail;
 import com.vista.pdg.service.sdd.impl.ContractBuilder;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -29,6 +30,36 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
 
   protected abstract String callModel(String systemPrompt, String userPrompt);
 
+  protected String callModel(String systemPrompt, String userPrompt, Duration remaining) {
+    return callModel(systemPrompt, userPrompt);
+  }
+
+  protected Duration generationTimeout() {
+    return Duration.ofSeconds(55);
+  }
+
+  protected long nanoTime() {
+    return System.nanoTime();
+  }
+
+  private Duration remaining(long deadline) {
+    long nanos = deadline - nanoTime();
+    if (nanos <= 0 || Thread.currentThread().isInterrupted()) {
+      throw new LlmUnavailableException(
+          "La generación excedió el tiempo disponible. Inténtalo de nuevo.", null, false);
+    }
+    return Duration.ofNanos(nanos);
+  }
+
+  private void backoff(int attempt, long deadline) {
+    if (remaining(deadline).toMillis() <= attempt * 1000L) {
+      throw new LlmUnavailableException(
+          "La generación excedió el tiempo disponible. Inténtalo de nuevo.", null, false);
+    }
+    sleepBackoff(attempt);
+    remaining(deadline);
+  }
+
   @Override
   public StructureContract generate(String userPrompt) {
     return generate(userPrompt, ConversationContext.empty());
@@ -41,6 +72,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
    */
   @Override
   public StructureContract generate(String userPrompt, ConversationContext context) {
+    long deadline = nanoTime() + generationTimeout().toNanos();
     String systemPrompt = loadSystemPrompt();
     List<AttemptDetail> failures = new ArrayList<>();
     String base =
@@ -49,7 +81,8 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
 
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        String raw = callModel(systemPrompt, prompt);
+        String raw = callModel(systemPrompt, prompt, remaining(deadline));
+        remaining(deadline);
         String json = sanitize(raw);
         log.debug("LLM attempt {} raw response: {}", attempt, raw);
         if ("OUT_OF_SCOPE".equals(new ObjectMapper().readTree(json).path("error").asText())) {
@@ -61,12 +94,16 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
       } catch (UnsupportedStructureException e) {
         throw e;
       } catch (LlmUnavailableException e) {
-        // Créditos, cuota o clave: el mismo prompt no va a funcionar en un segundo intento.
-        throw e;
+        // Keep the same prompt and context: an overloaded provider did not return invalid JSON.
+        // All failure types share the same three-attempt budget.
+        if (!e.isRetryable() || attempt == MAX_ATTEMPTS) throw e;
+        log.warn(
+            "LLM temporarily unavailable; retrying attempt {} of {}", attempt + 1, MAX_ATTEMPTS);
+        backoff(attempt, deadline);
       } catch (InvalidContractException e) {
         failures.add(new AttemptDetail(attempt, e.getMessage()));
         if (attempt < MAX_ATTEMPTS) {
-          sleepBackoff(attempt);
+          backoff(attempt, deadline);
           prompt =
               base
                   + "\n\nYour previous response failed with: "
@@ -77,7 +114,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
         String msg = e.getClass().getSimpleName() + ": " + e.getMessage();
         failures.add(new AttemptDetail(attempt, msg));
         if (attempt < MAX_ATTEMPTS) {
-          sleepBackoff(attempt);
+          backoff(attempt, deadline);
           prompt =
               base
                   + "\n\nYour previous response failed with: "
@@ -120,7 +157,7 @@ public abstract class AbstractLlmAdapter implements LlmAdapter {
     return s;
   }
 
-  private void sleepBackoff(int attempt) {
+  protected void sleepBackoff(int attempt) {
     try {
       Thread.sleep(attempt * 1000L);
     } catch (InterruptedException ie) {

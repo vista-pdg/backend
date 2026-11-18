@@ -40,13 +40,14 @@ public final class HeapBasicsAlgorithms {
     public StepsResponse generate(AlgorithmRequest r) {
       List<Node3D> heap;
       CanvasTrace t;
-      if (operation.equals("heapify")) {
+      if (operation.equals("heapify") && !CanvasSequenceInput.present(r)) {
         heap = SequenceScene.fromValues(CanvasTrace.values(r, 64));
         var scene = SequenceScene.place(heap, "heap", false, false);
         t = new CanvasTrace(scene.nodes(), scene.edges());
       } else {
         t = new CanvasTrace(r);
         TreeIndex tree = new TreeIndex(t);
+        orderHeapChildren(t, tree);
         heap = new ArrayList<>();
         Deque<String> q = new ArrayDeque<>();
         q.add(tree.root);
@@ -60,7 +61,7 @@ public final class HeapBasicsAlgorithms {
           heap.add(t.byId.get(id));
           q.addAll(kids);
         }
-        for (int i = 1; i < heap.size(); i++)
+        for (int i = 1; !operation.equals("heapify") && i < heap.size(); i++)
           if (CanvasTrace.value(heap.get((i - 1) / 2)) < CanvasTrace.value(heap.get(i)))
             throw new InvalidAlgorithmInputException(
                 "Se requiere un heap máximo; usa Heapify para construirlo.");
@@ -192,6 +193,42 @@ public final class HeapBasicsAlgorithms {
               "máximo",
               heap.isEmpty() ? "vacío" : heap.getFirst().label()));
       return t.result(code);
+    }
+
+    /** Heap slots are logical positions; radial 3D coordinates do not define left/right. */
+    private static void orderHeapChildren(CanvasTrace t, TreeIndex tree) {
+      Map<String, Integer> order = new HashMap<>();
+      boolean indexed =
+          t.nodes.stream()
+              .anyMatch(n -> n.properties() != null && n.properties().containsKey("index"));
+      if (indexed) {
+        Set<Integer> seen = new HashSet<>();
+        for (Node3D n : t.nodes) {
+          Object value = n.properties() == null ? null : n.properties().get("index");
+          if (!(value instanceof Number number)
+              || number.doubleValue() != number.intValue()
+              || number.intValue() < 0
+              || number.intValue() >= t.nodes.size()
+              || !seen.add(number.intValue()))
+            throw new InvalidAlgorithmInputException(
+                "Los índices del heap deben ser únicos y consecutivos desde cero.");
+          order.put(n.id(), number.intValue());
+        }
+        if (order.get(tree.root) != 0)
+          throw new InvalidAlgorithmInputException("La raíz del heap debe ocupar el índice cero.");
+        for (Node3D n : t.nodes) {
+          int index = order.get(n.id());
+          if (index > 0 && !Objects.equals(order.get(tree.parent.get(n.id())), (index - 1) / 2))
+            throw new InvalidAlgorithmInputException(
+                "Los enlaces del heap no corresponden a sus índices.");
+        }
+      } else {
+        // Older canvas contracts have no slot metadata. Preserve their declared child order.
+        order.put(tree.root, 0);
+        for (Edge3D edge : t.edges) order.putIfAbsent(edge.to(), order.size());
+        for (Node3D node : t.nodes) order.putIfAbsent(node.id(), order.size());
+      }
+      tree.children.values().forEach(kids -> kids.sort(Comparator.comparingInt(order::get)));
     }
 
     private static void sink(CanvasTrace t, List<Node3D> heap, int i) {

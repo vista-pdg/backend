@@ -52,6 +52,31 @@ class CourseRegistrationTest extends IntegrationTestSupport {
     assertThat(cedi.getTerm().getCode()).isEqualTo("2026-1");
   }
 
+  @Autowired private com.vista.pdg.seeder.DataSeeder seeder;
+
+  @Test
+  @DisplayName("Los grupos CEDI-G3 y CEDI-G5 se crean una sola vez sin cambiar las matrículas")
+  void additionalGroupsAreIdempotent() throws Exception {
+    var student = userRepository.findByEmail("estudiante@u.icesi.edu.co").orElseThrow();
+    var enrollment = student.getCourse() == null ? null : student.getCourse().getCode();
+    seeder.run(null);
+    seeder.run(null);
+    for (String code : java.util.List.of("CEDI-G3", "CEDI-G5")) {
+      var group = courseRepository.findByCode(code).orElseThrow();
+      assertThat(group.getName()).isEqualTo("Computación y Estructuras Discretas I");
+      assertThat(group.getTerm().getCode()).isEqualTo("2026-1");
+      assertThat(courseRepository.findAll().stream().filter(c -> c.getCode().equals(code)).count())
+          .isEqualTo(1);
+      mockMvc
+          .perform(get("/api/courses"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$[?(@.code=='" + code + "')].termCode").value("2026-1"));
+    }
+    var after = userRepository.findByEmail(student.getEmail()).orElseThrow();
+    assertThat(after.getCourse() == null ? null : after.getCourse().getCode())
+        .isEqualTo(enrollment);
+  }
+
   @Test
   @DisplayName("GET /api/courses es público y lista sólo los cursos del periodo activo")
   void listaCursosDelPeriodoActivo() throws Exception {
